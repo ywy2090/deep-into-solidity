@@ -1,0 +1,116 @@
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {ContextUpgradeable} from "../utils/ContextUpgradeable.sol";
+import {Initializable} from "../proxy/utils/Initializable.sol";
+
+/**
+ * @dev 提供基本访问控制机制的合约模块，其中有一个账户（所有者）
+ * 可以被授予对特定函数的独占访问权限。
+ *
+ * 默认情况下，所有者账户将是部署合约的账户。这可以通过 {transferOwnership} 更改。
+ *
+ * 此模块通过继承使用。它将提供修饰符 `onlyOwner`，
+ * 可以应用于您的函数以限制其使用仅限于所有者。
+ */
+abstract contract OwnableUpgradeable is Initializable, ContextUpgradeable {
+    /// @custom:storage-location erc7201:openzeppelin.storage.Ownable
+    struct OwnableStorage {
+        address _owner;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Ownable")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant OwnableStorageLocation = 
+        0x9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c199300;
+
+    function _getOwnableStorage() private pure returns (OwnableStorage storage $) {
+        assembly {
+            $.slot := OwnableStorageLocation
+        }
+    }
+
+    /**
+     * @dev 所有者不是有效所有者时抛出
+     */
+    error OwnableUnauthorizedAccount(address account);
+
+    /**
+     * @dev 所有者无效（例如 `address(0)`）
+     */
+    error OwnableInvalidOwner(address owner);
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    /**
+     * @dev 使用 `initialOwner` 作为初始所有者初始化合约。
+     */
+    function __Ownable_init(address initialOwner) internal onlyInitializing {
+        __Ownable_init_unchained(initialOwner);
+    }
+
+    function __Ownable_init_unchained(address initialOwner) internal onlyInitializing {
+        if (initialOwner == address(0)) {
+            revert OwnableInvalidOwner(address(0));
+        }
+        _transferOwnership(initialOwner);
+    }
+
+    /**
+     * @dev 如果由所有者以外的任何账户调用，则抛出异常。
+     */
+    modifier onlyOwner() {
+        _checkOwner();
+        _;
+    }
+
+    /**
+     * @dev 返回当前所有者的地址。
+     */
+    function owner() public view virtual returns (address) {
+        OwnableStorage storage $ = _getOwnableStorage();
+        return $._owner;
+    }
+
+    /**
+     * @dev 如果发送者不是所有者，则抛出异常。
+     */
+    function _checkOwner() internal view virtual {
+        if (owner() != _msgSender()) {
+            revert OwnableUnauthorizedAccount(_msgSender());
+        }
+    }
+
+    /**
+     * @dev 使合约无所有者。之后将无法调用 `onlyOwner` 函数。
+     * 只能由当前所有者调用。
+     *
+     * 注意：放弃所有权将使合约没有所有者，从而禁用任何
+     * 仅对所有者可用的功能。
+     */
+    function renounceOwnership() public virtual onlyOwner {
+        _transferOwnership(address(0));
+    }
+
+    /**
+     * @dev 将合约的所有权转移到新账户（`newOwner`）。
+     * 只能由当前所有者调用。
+     */
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        if (newOwner == address(0)) {
+            revert OwnableInvalidOwner(address(0));
+        }
+        _transferOwnership(newOwner);
+    }
+
+    /**
+     * @dev 将合约的所有权转移到新账户（`newOwner`）。
+     * 内部函数，没有访问限制。
+     */
+    function _transferOwnership(address newOwner) internal virtual {
+        OwnableStorage storage $ = _getOwnableStorage();
+        address oldOwner = $._owner;
+        $._owner = newOwner;
+        emit OwnershipTransferred(oldOwner, newOwner);
+    }
+}
