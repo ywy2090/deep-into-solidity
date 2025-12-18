@@ -1,0 +1,3 @@
+[submodule "usdc-stablecoin-evm"]
+	path = usdc-stablecoin-evm
+	url = https://github.com/ywy2090/usdc-stablecoin-evm
