@@ -1,67 +1,157 @@
+
+
+# Ethereum PBS（Proposer-Builder Separation）技术文档
+
+> 本文档系统性描述以太坊当前（MEV-Boost 阶段）PBS 的**架构、角色、交易流、集中度结构、协作关系与经济博弈**，并通过 **Mermaid 图示直接体现产业结构**。
+
+---
+
+## 1. 背景与设计动机
+
+PBS 的核心目标并非消除 MEV，而是：
+
+> **将排序权从“技术特权”转化为“可拍卖的经济权力”**
+
+---
+
+## 2. PBS 角色结构、集中度与协作关系（重点）
+
+### 2.1 产业角色与数量级总览
+
+| 角色 | 数量级 | 集中度 | 产业属性 |
+|---|---|---|---|
+| User / Wallet | 数百万 | 极低 | MEV 价值来源 |
+| RPC | 数十 | 中 | Orderflow 闸门 |
+| Searcher | 数百–上千 | 低 | MEV 发现 |
+| Builder | < 10 | **极高** | 排序 / 区块工厂 |
+| Relay | 少数 | 高 | 拍卖与信任中介 |
+| Proposer | 数十万 | 随机 | MEV 租金终点 |
+
+---
+
+### 2.2 PBS 产业结构图（**集中度 + 协作关系 + 博弈**）
+
+> ✅ **这张图本身就是一页“研究结论”**
+
+```mermaid
+flowchart LR
+    %% ===== 上游：极度分散 =====
+    U["User / Wallet<br/>(Millions)<br/>极度分散"]
+    RPC["RPC<br/>(Dozens)<br/>中度集中"]
+
+    %% ===== 中游：高度集中（沙漏腰部）=====
+    S["Searcher<br/>(100s–1000s)<br/>高度竞争"]
+    B["Builder<br/>(&lt;10)<br/>高度集中<br/>排序权核心"]
+    R["Relay<br/>(Few)<br/>寡头"]
+
+    %% ===== 下游：数量大但权力被动 =====
+    P["Proposer / Validator<br/>(100k&#43;)<br/>随机、被动"]
+    C["Ethereum Chain"]
+
+    %% ===== 技术 / 数据流 =====
+    U --> RPC
+    RPC -->|"Public Tx"| S
+    RPC -->|"Private Flow"| B
+    S -->|"Bundles"| B
+    B -->|"Block &#43; Bid"| R
+    R -->|"Best Header"| P
+    P --> C
+
+    %% ===== 利益 / 博弈关系（虚线）=====
+    U -. "MEV 损失" .-> S
+    S -. "竞价压缩" .-> B
+    B -. "Bid 租金" .-> P
+    RPC -. "Orderflow 定价权" .-> B
 ```
-flowchart TD
-    subgraph Users ["用户层"]
-        U1["用户 A"] -->|"交易 T1"| EL1
-        U2["用户 B"] -->|"交易 T2"| EL1
-        U3["用户 C"] -->|"交易 T3"| EL2
-    end
 
-    subgraph Executors ["执行层节点 / 网络"]
-        EL1["执行节点 1<br/>(普通节点)"] -->|"广播"| Mempool
-        EL2["执行节点 2<br/>(普通节点)"] -->|"广播"| Mempool
-        Mempool[("公共内存池<br/>P2P 网络")]
-    end
+---
 
-    subgraph Searchers ["MEV 搜索者"]
-        S1["搜索者 1"] -->|"Bundle B1"| BB1
-        S2["搜索者 2"] -->|"Bundle B2"| BB1
-        S3["搜索者 3"] -->|"Bundle B3"| BB2
-    end
+### 2.3 如何从图中“读出 PBS 的本质”
 
-    subgraph Builders ["区块构建者 - 多个并行"]
-        BB1["构建者 1<br/>(如 Flashbots Builder)"] -->|"构造 Payload P1"| R1
-        BB1 -->|"同时提交"| R2
-        BB2["构建者 2<br/>(如 bloXroute Builder)"] -->|"构造 Payload P2"| R1
-        BB2 -->|"同时提交"| R3
-        BB3["构建者 3"] -->|"Payload P3"| R2
-    end
+#### ✅ 集中度结构（沙漏型）
+- **上游（用户 / Searcher）**：极度分散
+- **中游（Builder / Relay）**：高度集中
+- **下游（Proposer）**：数量大，但**策略权为零**
 
-    subgraph Relays ["中继 - 多对多连接"]
-        R1["中继 1<br/>(Flashbots)"]
-        R2["中继 2<br/>(bloXroute)"]
-        R3["中继 3<br/>(Eden)"]
-    end
+> **权力不在数量，而在“排序控制点”**
 
-    subgraph Consensus ["共识层 - 验证者集合"]
-        Vpool[("&gt;1,000,000 验证者")]
-        Vpool -->|"每 slot 随机选择"| Proposer
-        Proposer["提议者<br/>(当前 slot 的 1 个验证者)"]
-        Proposer -->|"通过 MEV-Boost"| R1
-        Proposer -->|"同时监听"| R2
-        Proposer -->|"同时监听"| R3
+---
 
-        Attesters[("数千 Attester<br/>验证者委员会")]
-    end
+#### ✅ 协作关系
+- RPC ↔ Builder：**战略级绑定**
+- Searcher ↔ Builder：**完全竞争**
+- Builder ↔ Proposer：**纯价格关系（Bid）**
 
-    %% 数据流
-    Mempool -->|"交易流"| BB1
-    Mempool -->|"交易流"| BB2
-    Mempool -->|"交易流"| BB3
+---
 
-    R1 -->|"提供区块头 H1 + 出价"| Proposer
-    R2 -->|"提供区块头 H2 + 出价"| Proposer
-    R3 -->|"提供区块头 H3 + 出价"| Proposer
+#### ✅ 利益流向
+\[
+\text{User Loss}
+\rightarrow \text{Searcher}
+\rightarrow \text{Builder}
+\rightarrow \text{Proposer}
+\]
 
-    Proposer -->|"选择最高出价<br/>(e.g., H2)"| BB2
-    BB2 -->|"交付完整 Payload P2"| Proposer
+---
 
-    Proposer -->|"广播完整区块"| BeaconChain[("信标链网络")]
-    BeaconChain --> Attesters
-    Attesters -->|"投票确认"| Finalized["区块最终确认"]
+## 3. 单笔交易在 PBS 中的流线与时序（增强版）
 
-    classDef user fill:#fff8dc,stroke:#daa520;
-    classDef exec fill:#f0f8ff,stroke:#4682b4;
-    classDef searcher fill:#ffe4b5,stroke:#d2691e;
-    classDef builder fill:#d4f7e5,stroke:#2e8b57;
-    classDef relay fill:#e6e6fa,stroke:#333;
+### 3.1 交易视角流线图（含角色权力提示）
+
+```mermaid
+flowchart LR
+    TX["Transaction"]
+    S["Searcher<br/>多而弱"]
+    B["Builder<br/>少而强"]
+    P["Proposer<br/>被动"]
+    BL["Block"]
+
+    TX --> S
+    S -->|"Bundle"| B
+    B -->|"Highest Bid Wins"| P
+    P --> BL
 ```
+
+> **交易的命运并不掌握在用户手中，而在 Builder 的排序函数中**
+
+---
+
+### 3.2 交易时序图（含角色策略空间）
+
+```mermaid
+sequenceDiagram
+    participant U as User (无策略)
+    participant RPC as RPC (可筛选)
+    participant S as Searcher (竞争)
+    participant B as Builder (优化排序)
+    participant R as Relay (中立)
+    participant P as Proposer (选最高价)
+
+    U->>RPC: Submit Tx
+    RPC->>S: Tx visible
+    S->>B: Bundle (MEV)
+    B->>R: Block + Bid
+    R->>P: Best Header
+    P->>R: Request Payload
+```
+
+---
+
+## 4. 核心结论（图示背后的真相）
+
+> **PBS 的权力核心不是 Proposer，而是 Builder。**  
+> **PBS 的入口不是协议，而是 RPC / Orderflow。**
+
+- Builder 是排序权的事实垄断者
+- RPC 决定谁有资格参与博弈
+- Searcher 只是消耗品
+- Proposer 是 MEV 的“收益终点”
+
+---
+
+## 5. 一句话总结（可以直接引用）
+
+> **以太坊 PBS 是一个“上游分散、中游垄断、下游金融化”的 MEV 产业系统。**
+
+---
+
