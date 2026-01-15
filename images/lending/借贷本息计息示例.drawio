@@ -1,0 +1,97 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.3.0 Chrome/140.0.7339.249 Electron/38.7.2 Safari/537.36" version="29.3.0">
+  <diagram name="第 1 页" id="bP92yIoAShpnhSHo17gJ">
+    <mxGraphModel dx="1257" dy="690" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="oBAswomTcb-k4fY2c4hI-1" parent="1" style="shape=actor;whiteSpace=wrap;html=1;" value="张三" vertex="1">
+          <mxGeometry height="80" width="60" x="120" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#cce5ff;strokeColor=#333333;" value="借&lt;br&gt;1000 U" vertex="1">
+          <mxGeometry height="40" width="80" x="240" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ccffcc;strokeColor=#333333;" value="还&lt;br&gt;200 U" vertex="1">
+          <mxGeometry height="40" width="80" x="240" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-4" edge="1" parent="1" source="oBAswomTcb-k4fY2c4hI-1" style="endArrow=classic;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="oBAswomTcb-k4fY2c4hI-2" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="120" y="450" as="sourcePoint" />
+            <mxPoint x="170" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-5" edge="1" parent="1" source="oBAswomTcb-k4fY2c4hI-1" style="endArrow=classic;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="oBAswomTcb-k4fY2c4hI-3" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="120" y="450" as="sourcePoint" />
+            <mxPoint x="170" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#333333;" value="累积利率=1.02%" vertex="1">
+          <mxGeometry height="40" width="120" x="380" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#333333;" value="累积利率=1.04193%" vertex="1">
+          <mxGeometry height="40" width="140" x="380" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-8" edge="1" parent="1" source="oBAswomTcb-k4fY2c4hI-2" style="endArrow=classic;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="oBAswomTcb-k4fY2c4hI-6" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="120" y="450" as="sourcePoint" />
+            <mxPoint x="170" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-9" edge="1" parent="1" source="oBAswomTcb-k4fY2c4hI-3" style="endArrow=classic;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="oBAswomTcb-k4fY2c4hI-7" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="120" y="450" as="sourcePoint" />
+            <mxPoint x="170" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#333333;" value="借:1000&lt;br&gt;累积利率: 1.02%" vertex="1">
+          <mxGeometry height="40" width="140" x="570" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;" value="本息 = 本金 * 当前累积利率 / 借款时累积利率&lt;br&gt;= 1000 * 1.04193 / 1.02&lt;br&gt;= 1021.5" vertex="1">
+          <mxGeometry height="80" width="250" x="570" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-12" edge="1" parent="1" source="oBAswomTcb-k4fY2c4hI-6" style="endArrow=classic;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="oBAswomTcb-k4fY2c4hI-10" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="120" y="450" as="sourcePoint" />
+            <mxPoint x="170" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-13" edge="1" parent="1" source="oBAswomTcb-k4fY2c4hI-7" style="endArrow=classic;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="oBAswomTcb-k4fY2c4hI-11" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="120" y="450" as="sourcePoint" />
+            <mxPoint x="170" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-17" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#333333;" value="借: 821.5&lt;br&gt;累积利率: 1.04193%" vertex="1">
+          <mxGeometry height="40" width="140" x="625" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-18" edge="1" parent="1" source="oBAswomTcb-k4fY2c4hI-11" style="endArrow=classic;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="oBAswomTcb-k4fY2c4hI-17" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="120" y="450" as="sourcePoint" />
+            <mxPoint x="670" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-20" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#666666;dashed=1;dashPattern=5 5;" value="累积利率=1%&lt;br&gt;利率=2%" vertex="1">
+          <mxGeometry height="40" width="120" x="380" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-21" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#666666;dashed=1;dashPattern=5 5;" value="累积利率=1.02%&lt;br&gt;利率=2.15%" vertex="1">
+          <mxGeometry height="40" width="140" x="380" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-22" edge="1" parent="1" source="oBAswomTcb-k4fY2c4hI-6" style="endArrow=none;dashed=1;html=1;dashPattern=5 5;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" target="oBAswomTcb-k4fY2c4hI-20" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="120" y="450" as="sourcePoint" />
+            <mxPoint x="170" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-23" edge="1" parent="1" source="oBAswomTcb-k4fY2c4hI-7" style="endArrow=none;dashed=1;html=1;dashPattern=5 5;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" target="oBAswomTcb-k4fY2c4hI-21" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="120" y="450" as="sourcePoint" />
+            <mxPoint x="170" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oBAswomTcb-k4fY2c4hI-24" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;" value="&lt;b&gt;借贷本息计息过程&lt;/b&gt;" vertex="1">
+          <mxGeometry height="20" width="220" x="340" y="410" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
