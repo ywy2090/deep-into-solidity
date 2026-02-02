@@ -1314,7 +1314,7 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 └─ 验证者收入多元化（通胀+费用+MEV）
 
 ⚠️ 权衡：
-├─ 32 ETH高门槛限制独立验证者参与
+├─ 32+ ETH高门槛限制独立验证者参与
 ├─ 质押率较低（~28%），安全性依赖经济价值
 ├─ 供应不可预测，依赖持续高使用量
 ├─ L2迁移可能减少L1费用和燃烧量
@@ -1477,7 +1477,7 @@ def calculate_base_reward(validator_effective_balance, total_active_balance):
     计算单个验证者每 epoch 的基础奖励
 
     参数:
-        validator_effective_balance: 验证者有效余额（通常32 ETH）
+        validator_effective_balance: 验证者有效余额
         total_active_balance: 所有活跃验证者的总余额
 
     返回:
@@ -1637,10 +1637,6 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 
 #### 5.1 质押概述
 
-**什么是以太坊质押？**
-
-质押（Staking）是以太坊 2.0 的核心，用户锁定 32 ETH 成为验证者，参与区块验证和共识。
-
 **质押的核心价值：**
 
 ```text
@@ -1649,13 +1645,13 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 ├─────────────────────────────────────────────┤
 │                                              │
 │  独立验证者 (Solo Stakers)                  │
-│    ├─ 质押 32 ETH                           │
+│    ├─ 质押 32+ ETH                           │
 │    ├─ 运行信标链和执行层客户端              │
 │    ├─ 获得全部奖励（无佣金）                │
 │    └─ 承担 Slashing 风险                    │
 │                                              │
 │  质押池用户 (Pool Stakers)                  │
-│    ├─ 质押任意金额（< 32 ETH）              │
+│    ├─ 质押任意金额              │
 │    ├─ 通过 Lido、Rocket Pool 等协议        │
 │    ├─ 获得流动性质押代币（LST）             │
 │    └─ 支付协议费用                          │
@@ -1672,7 +1668,7 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 
 | 特性 | 说明 |
 |------|------|
-| ✅ **32 ETH 门槛** | 成为独立验证者需要 32 ETH |
+| ✅ **32 ETH 门槛** | 成为独立验证者至少需要 32 ETH |
 | ✅ **罚没机制** | 作恶或长期离线会被 Slashing |
 | ✅ **提款启用** | 上海升级后可以提取质押和奖励 |
 | ⚠️ **质押队列** | 激活和退出有速率限制 |
