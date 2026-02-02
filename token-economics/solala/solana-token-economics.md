@@ -1314,6 +1314,33 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 
 ---
 
+### 📌 版本说明
+
+以太坊的奖励机制经历了多次重要升级，本文档基于 **Altair 升级后的规范**（2021年10月）。主要版本差异：
+
+| 版本 | 时间 | 主要变化 |
+|------|------|---------|
+| **Phase 0** | 2020.12-2021.10 | 初始PoS共识层，使用`BASE_REWARDS_PER_EPOCH=4` |
+| **Altair** | 2021.10+ | 移除`BASE_REWARDS_PER_EPOCH`，改用增量计算，引入同步委员会 |
+| **The Merge** | 2022.09+ | 从PoW切换到PoS，发行量减少90% |
+| **Shanghai** | 2023.04+ | 启用质押提款功能 |
+| **Deneb** | 2024.03+ | 引入Blob交易（EIP-4844）|
+
+**本文档采用的公式版本：Altair**
+
+主要原因：
+
+- ✅ Altair是当前主网使用的奖励计算方式
+- ✅ 更高效的基于增量的计算
+- ✅ The Merge之后的所有版本都基于Altair的奖励模型
+
+**参考规范：**
+
+- [Altair Beacon Chain 规范](https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/beacon-chain.md)
+- [Phase 0 规范](https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md)（历史参考）
+
+---
+
 ### 以太坊设计决策
 
 根据第一章的10个核心问题，以下是以太坊的设计选择和实际实施情况：
@@ -1769,6 +1796,8 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 
 #### 5.3 验证者奖励算法详解
 
+> **重要说明：** 以下奖励机制基于 **Altair 升级后的规范**（2021年10月），与Phase 0（2020-2021）的计算方式不同。Altair移除了`BASE_REWARDS_PER_EPOCH`常量，改用基于增量的计算方式。
+
 ##### 5.3.1 核心参数与常量
 
 **时间参数：**
@@ -1779,12 +1808,11 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 1 年      ≈ 82,125 Epochs
 ```
 
-**基础常量：**
+**基础常量（Altair版本）：**
 
 ```yaml
-base_reward_factor: 64                    # 基础奖励因子
-base_rewards_per_epoch: 4                 # 每 epoch 基础奖励数
-effective_balance_increment: 1 ETH        # 有效余额增量单位
+BASE_REWARD_FACTOR: 64                    # 基础奖励因子
+EFFECTIVE_BALANCE_INCREMENT: 1 ETH        # 有效余额增量单位（1,000,000,000 Gwei）
 WEIGHT_DENOMINATOR: 64                    # 权重分母
 
 # 参与标志权重分配
@@ -1809,30 +1837,44 @@ PROPOSER_WEIGHT: 8                        # 提议者额外权重 (12.5%)
 └─────────────────────────────────────────────┘
 ```
 
-##### 5.3.2 基础奖励计算
+##### 5.3.2 基础奖励计算（Altair版本）
 
 **第一步：计算基础奖励**
 
-每个验证者每个 Epoch 的基础奖励是所有其他奖励的基础：
+Altair升级后，基础奖励计算改为基于增量（increment）的方式，以提高效率并简化计算：
 
 ```python
 """
-以太坊验证者基础奖励计算
+以太坊验证者基础奖励计算（Altair版本）
 这是所有其他奖励（Source、Target、Head）的基础
 """
 
-# === 主网核心参数 ===
+# === 主网核心参数（Altair） ===
 BASE_REWARD_FACTOR = 64              # 基础奖励因子
-BASE_REWARDS_PER_EPOCH = 4           # 每epoch基础奖励数
 EFFECTIVE_BALANCE_INCREMENT = 1e9    # 1 ETH = 1,000,000,000 Gwei
 
-def get_base_reward(validator_effective_balance, total_active_balance):
+def get_base_reward_per_increment(state):
+    """
+    计算每个增量的基础奖励（Altair新增）
+    
+    参数:
+        state: 信标链状态（包含总活跃余额）
+    
+    返回:
+        每个1 ETH增量的基础奖励（Gwei）
+    """
+    total_active_balance = get_total_active_balance(state)
+    sqrt_total_active_balance = integer_squareroot(total_active_balance)
+    
+    return (EFFECTIVE_BALANCE_INCREMENT * BASE_REWARD_FACTOR) // sqrt_total_active_balance
+
+def get_base_reward(state, validator_index):
     """
     计算单个验证者的基础奖励（每 epoch）
 
     参数:
-        validator_effective_balance: 验证者有效余额（Gwei，通常 32 ETH）
-        total_active_balance: 所有活跃验证者的总余额（Gwei）
+        state: 信标链状态
+        validator_index: 验证者索引
 
     返回:
         base_reward: 该验证者每个 epoch 的基础奖励（Gwei）
@@ -1842,17 +1884,15 @@ def get_base_reward(validator_effective_balance, total_active_balance):
         - 网络质押总量越高 → 基础奖励越低（平方根关系）
         - 这确保了动态平衡：质押少时APY高，质押多时APY低
     """
-    # 计算总余额的平方根
-    sqrt_total_active_balance = sqrt(total_active_balance)
-
-    # 基础奖励公式
-    base_reward = (validator_effective_balance * BASE_REWARD_FACTOR) / \
-                  (sqrt_total_active_balance * BASE_REWARDS_PER_EPOCH)
-
-    return base_reward
+    # 计算验证者有效余额的增量数（以1 ETH为单位）
+    effective_balance = state.validators[validator_index].effective_balance
+    increments = effective_balance // EFFECTIVE_BALANCE_INCREMENT
+    
+    # 基础奖励 = 增量数 × 每增量基础奖励
+    return increments * get_base_reward_per_increment(state)
 ```
 
-**计算示例：**
+**计算示例（Altair版本）：**
 
 ```text
 假设条件：
@@ -1860,15 +1900,28 @@ def get_base_reward(validator_effective_balance, total_active_balance):
 - 总活跃余额: 34,000,000 ETH = 34,000,000,000,000,000 Gwei
 - √总活跃余额: √34,000,000,000,000,000 ≈ 184,390,889 Gwei
 
-基础奖励计算：
-= (32,000,000,000 × 64) / (184,390,889 × 4)
-= 2,048,000,000,000 / 737,563,556
-≈ 2,777,000 Gwei
-≈ 0.002777 ETH per epoch
+步骤1：计算每增量基础奖励
+= (1,000,000,000 × 64) / 184,390,889
+= 64,000,000,000 / 184,390,889
+≈ 347 Gwei per increment
 
-年化基础奖励：
-= 0.002777 × 82,125 epochs
-≈ 228 ETH/年（理论最大值，需乘以权重比例）
+步骤2：计算验证者增量数
+increments = 32,000,000,000 / 1,000,000,000 = 32
+
+步骤3：计算验证者基础奖励
+base_reward = 32 × 347 ≈ 11,104 Gwei per epoch
+            ≈ 0.000011104 ETH per epoch
+
+年化基础奖励（理论最大）：
+= 0.000011104 × 82,125 epochs
+≈ 0.912 ETH/年
+
+注意：这是单个基础奖励单元。实际奖励需要：
+- 乘以参与标志权重 (Source: 14/64, Target: 26/64, Head: 14/64)
+- 考虑网络参与率
+- 加上提议者奖励和执行层收入
+
+实际完整年化收益约为 3.5-4.5% APY (即 1.1-1.4 ETH/年)
 ```
 
 ##### 5.3.3 证明奖励详细计算
@@ -1976,11 +2029,11 @@ def calculate_total_epoch_reward(validator_info, network_state):
     return total_reward
 ```
 
-**具体示例计算：**
+**具体示例计算（Altair版本）：**
 
 ```text
 假设条件：
-- 基础奖励: 2,777,000 Gwei
+- 基础奖励: 11,104 Gwei（从上面计算得出）
 - 网络参与率: 90% 的验证者正确参与
 - 总活跃增量: 34,000,000 increments
 - 参与增量: 30,600,000 increments (90%)
@@ -1990,37 +2043,37 @@ def calculate_total_epoch_reward(validator_info, network_state):
 1. Target 投票奖励（权重 26）：
 
 如果正确参与：
-reward = (2,777,000 × 26 × 30,600,000) / (34,000,000 × 64)
-       = 2,209,381,200,000,000 / 2,176,000,000
-       ≈ 1,015,000 Gwei
-       ≈ 0.001015 ETH
+reward = (11,104 × 26 × 30,600,000) / (34,000,000 × 64)
+       = 8,838,489,600,000 / 2,176,000,000
+       ≈ 4,062 Gwei
+       ≈ 0.000004062 ETH
 
 如果未参与：
-penalty = (2,777,000 × 26) / 64
-        ≈ 1,128,000 Gwei
-        ≈ 0.001128 ETH
+penalty = (11,104 × 26) / 64
+        ≈ 4,512 Gwei
+        ≈ 0.000004512 ETH
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 2. Source 投票奖励（权重 14）：
 
 如果正确参与：
-reward = (2,777,000 × 14 × 30,600,000) / (34,000,000 × 64)
-       ≈ 547,000 Gwei
-       ≈ 0.000547 ETH
+reward = (11,104 × 14 × 30,600,000) / (34,000,000 × 64)
+       ≈ 2,189 Gwei
+       ≈ 0.000002189 ETH
 
 如果未参与：
-penalty = (2,777,000 × 14) / 64
-        ≈ 607,000 Gwei
-        ≈ 0.000607 ETH
+penalty = (11,104 × 14) / 64
+        ≈ 2,429 Gwei
+        ≈ 0.000002429 ETH
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 3. Head 投票奖励（权重 14）：
 
 如果正确参与：
-reward ≈ 547,000 Gwei
-       ≈ 0.000547 ETH
+reward ≈ 2,189 Gwei
+       ≈ 0.000002189 ETH
 
 如果未参与：
 penalty = 0  ⚠️ Head 不惩罚！
@@ -2029,95 +2082,125 @@ penalty = 0  ⚠️ Head 不惩罚！
 
 总计（完美表现，90% 网络参与率）：
 
-每 Epoch 奖励 = 1,015,000 + 547,000 + 547,000
-               = 2,109,000 Gwei
-               ≈ 0.002109 ETH
+每 Epoch 奖励 = 4,062 + 2,189 + 2,189
+               = 8,440 Gwei
+               ≈ 0.000008440 ETH
 
-年化收益 = 0.002109 × 82,125
-         ≈ 173.2 ETH/年
-         ≈ 5.4% APY（基于 32 ETH）
+年化收益（仅共识层证明奖励）：
+= 0.000008440 × 82,125 epochs
+≈ 0.693 ETH/年
+≈ 2.17% APY（基于 32 ETH）
 
+实际总收益还需加上：
++ 区块提议奖励（平均 +1.5% APY）
++ 执行层收入（优先费+MEV，平均 +0.8% APY）
++ 同步委员会奖励（偶尔，平均 +0.02% APY）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+实际总 APY ≈ 3.5-4.5%（即 1.1-1.4 ETH/年）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-##### 5.3.4 区块提议者额外奖励
+##### 5.3.4 区块提议者额外奖励（Altair版本）
 
 当验证者被选中提议区块时（随机选择，平均每 ~N epochs 一次，N = 验证者总数 / 32），会获得额外奖励：
 
 ```python
 """
-区块提议者额外奖励
+区块提议者额外奖励（Altair版本）
 提议者通过包含其他验证者的证明获得额外收益
 """
 
 # === 提议者权重 ===
-PROPOSER_WEIGHT = 8              # 提议者获得 8/64 = 1/8
+PROPOSER_WEIGHT = 8              # 提议者权重
 WEIGHT_DENOMINATOR = 64
 
-def calculate_proposer_reward(included_attestations):
+def calculate_proposer_reward(state, block_body):
     """
-    计算区块提议者的额外奖励
+    计算区块提议者的额外奖励（Altair实际算法）
 
     参数:
-        included_attestations: 提议区块中包含的所有证明列表
-            - 每个证明包含多个参与的验证者
+        state: 信标链状态
+        block_body: 区块体（包含证明）
 
     返回:
-        total_proposer_reward: 提议者获得的总额外奖励
+        proposer_reward: 提议者获得的总奖励
 
-    核心机制:
-        提议者从每个被包含证明的参与者基础奖励中获得 1/8
-        这激励提议者：
-        1. 包含尽可能多的有效证明
-        2. 及时提议区块（延迟会导致证明过期）
+    核心机制（Altair版本）:
+        提议者从每个新参与标志获得额外奖励
+        公式: proposer_reward = sum(base_reward * weight) / proposer_reward_denominator
+        其中 proposer_reward_denominator = (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT) * WEIGHT_DENOMINATOR // PROPOSER_WEIGHT
+             = (64 - 8) * 64 / 8 = 56 * 8 = 448
     """
-    total_proposer_reward = 0
-
+    proposer_reward_numerator = 0
+    
     # 遍历区块中包含的所有证明
-    for attestation in included_attestations:
-        # 遍历每个证明中的所有参与验证者
-        for attester in attestation.participants:
+    for attestation in block_body.attestations:
+        # 获取证明的参与标志索引
+        participation_flag_indices = get_attestation_participation_flag_indices(
+            state, attestation.data, state.slot - attestation.data.slot
+        )
+        
+        # 遍历证明中的所有验证者
+        for attester_index in get_attesting_indices(state, attestation):
+            # 对于每个新设置的参与标志
+            for flag_index in participation_flag_indices:
+                epoch_participation = get_epoch_participation(state, attestation.data.target.epoch)
+                
+                # 如果这是新标志（之前未设置）
+                if not has_flag(epoch_participation[attester_index], flag_index):
+                    base_reward = get_base_reward(state, attester_index)
+                    weight = PARTICIPATION_FLAG_WEIGHTS[flag_index]
+                    
+                    # 累加到提议者奖励分子
+                    proposer_reward_numerator += base_reward * weight
+    
+    # 计算最终提议者奖励
+    proposer_reward_denominator = (
+        (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT) * WEIGHT_DENOMINATOR // PROPOSER_WEIGHT
+    )
+    # proposer_reward_denominator = (64 - 8) * 64 / 8 = 448
+    
+    proposer_reward = proposer_reward_numerator // proposer_reward_denominator
+    
+    return proposer_reward
 
-            # 获取该证明者的基础奖励
-            attester_base_reward = get_base_reward(
-                attester.effective_balance,
-                network.total_active_balance
-            )
-
-            # 提议者从中获得 1/8
-            proposer_share = (attester_base_reward * PROPOSER_WEIGHT) // WEIGHT_DENOMINATOR
-            total_proposer_reward += proposer_share
-
-    return total_proposer_reward
-
-# === 示例：满区块的提议者奖励 ===
-# 假设一个区块:
-# - 包含多个证明聚合（attestations）
-# - 提议者从每个被包含证明的参与者中获得其基础奖励的 1/8
-# - 实际奖励取决于包含的证明数量和参与率
+# === 实际计算示例 ===
+# 假设一个区块包含：
+# - 128个证明（MAX_ATTESTATIONS）
+# - 每个证明平均包含 256 个验证者
+# - 所有证明都设置了3个新标志（Source, Target, Head）
+# - 基础奖励 = 11,104 Gwei
 #
-# 保守估计（单个区块）：
-# 提议者奖励 ≈ 0.01-0.03 ETH per block
-# (具体数值取决于网络参与率和包含的证明数量)
+# proposer_reward_numerator = 128 × 256 × (11,104 × (14+26+14))
+#                          = 32,768 × (11,104 × 54)
+#                          ≈ 19,626,516,480 Gwei
+#
+# proposer_reward = 19,626,516,480 / 448
+#                 ≈ 43,808,295 Gwei
+#                 ≈ 0.0438 ETH per block
 ```
 
 **提议者奖励示例：**
 
 ```text
-提议者奖励机制：
-- 从包含在区块中的每个证明参与者的基础奖励中获得 1/8
-- 实际奖励取决于网络参与率和包含的证明数量
+提议者奖励机制（Altair版本）：
+- 从包含在区块中的每个新参与标志获得奖励
+- 奖励比例基于复杂公式，大约相当于证明者奖励的 1/7
 
-保守估计：
-单次提议奖励: 0.01-0.03 ETH
-(取决于包含的证明数量和网络参与率)
+实际奖励范围（取决于包含的证明数量和网络参与率）：
+单次提议奖励: 0.02-0.05 ETH
+（满区块、高参与率时可达 0.05+ ETH）
 
 年化影响（假设平均每 1000 epochs 提议一次）：
 - 提议频率: 82,125 epochs/年 ÷ 1000 ≈ 82 次/年
-- 年收益: 0.02 ETH × 82 ≈ 1.64 ETH/年
-- APY: 1.64 / 32 ≈ 5.1% 额外收益
+- 年收益: 0.03 ETH × 82 ≈ 2.46 ETH/年
+- APY: 2.46 / 32 ≈ 7.7% 额外收益
 
-注：实际提议者奖励波动较大，以上为估算值
+注意：
+1. 提议频率与验证者总数相关（越多验证者，提议频率越低）
+2. 当前约1,060,000验证者，每个验证者约每33,125个epoch提议一次
+3. 实际提议者奖励波动较大，以上为估算值
 ```
 
 ##### 5.3.5 同步委员会奖励
@@ -2195,14 +2278,15 @@ def calculate_sync_committee_reward(network_state):
 
 ```python
 """
-不活跃分数与惩罚机制
+不活跃分数与惩罚机制（Altair版本）
 当验证者离线时，会累积不活跃分数并受到惩罚
 """
 
-# === 不活跃惩罚参数 ===
-INACTIVITY_SCORE_BIAS = 4              # 未参与时分数增加量
-INACTIVITY_SCORE_RECOVERY_RATE = 16   # 正常期恢复速率
-INACTIVITY_PENALTY_QUOTIENT = 2**24   # 16,777,216（惩罚商）
+# === 不活跃惩罚参数（Altair） ===
+INACTIVITY_SCORE_BIAS = 4                           # 未参与时分数增加量
+INACTIVITY_SCORE_RECOVERY_RATE = 16                # 正常期恢复速率
+INACTIVITY_PENALTY_QUOTIENT_ALTAIR = 3 * 2**24    # 50,331,648（Altair惩罚商）
+# 注：Phase 0使用 2**26 = 67,108,864，Altair降低了惩罚使其更严格
 
 def update_inactivity_score(validator, network_state):
     """
@@ -2256,18 +2340,19 @@ def calculate_inactivity_penalty(validator, network_state):
     返回:
         penalty: 不活跃惩罚金额（Gwei）
 
-    惩罚机制:
+    惩罚机制（Altair版本）:
         - 只有未参与 Target 的验证者才受惩罚
         - 惩罚与不活跃分数成正比
+        - Altair使用更严格的惩罚商（50M vs 67M）
         - 不活跃泄漏期惩罚显著增加
     """
     # 只有未参与 Target 的才惩罚
     if validator.participated_in_target:
         return 0
 
-    # 计算惩罚
+    # 计算惩罚（Altair公式）
     penalty_numerator = validator.effective_balance * validator.inactivity_score
-    penalty_denominator = INACTIVITY_SCORE_BIAS * INACTIVITY_PENALTY_QUOTIENT
+    penalty_denominator = INACTIVITY_SCORE_BIAS * INACTIVITY_PENALTY_QUOTIENT_ALTAIR
 
     penalty = penalty_numerator // penalty_denominator
 
@@ -2298,11 +2383,14 @@ def calculate_inactivity_penalty(validator, network_state):
 长期离线（数天）：
 - 分数持续累积
 - 假设离线 100 epochs，未进入泄漏期：
-  - 损失的奖励：100 × 0.002109 ≈ 0.21 ETH
-  - 不活跃惩罚（分数约 400）：
-    penalty = (32 ETH × 400) / (4 × 16,777,216)
-            ≈ 0.00019 ETH
-  - 总损失：≈ 0.21 ETH（主要是错过的奖励）
+  - 损失的奖励：100 × 0.000008440 ≈ 0.000844 ETH
+  - 不活跃惩罚（分数约 400，使用Altair公式）：
+    penalty = (32 ETH × 400) / (4 × 50,331,648)
+            = 12,800 ETH / 201,326,592
+            ≈ 0.0000636 ETH
+  - 总损失：≈ 0.000908 ETH（主要是错过的奖励）
+  
+注：这只是证明奖励的损失，不包括错过的提议者和执行层收入
 
 不活跃泄漏期（网络无法最终化 >4 epochs）：
 - 二次惩罚开始生效
@@ -2318,28 +2406,35 @@ def calculate_inactivity_penalty(validator, network_state):
 验证者质押: 32 ETH
 网络状态: 34M ETH 总质押，90% 参与率
 
-每 Epoch 收益:
-  Source 奖励:  0.000547 ETH
-  Target 奖励:  0.001015 ETH
-  Head 奖励:    0.000547 ETH
+每 Epoch 收益（Altair版本）:
+  Source 奖励:  0.000002189 ETH
+  Target 奖励:  0.000004062 ETH
+  Head 奖励:    0.000002189 ETH
   ─────────────────────────
-  共识层小计:   0.002109 ETH/epoch
+  共识层小计:   0.000008440 ETH/epoch
 
 年化收益 (82,125 epochs):
-  共识层:       173.2 ETH/年 = 5.41% APY
+  共识层证明:   0.693 ETH/年 = 2.17% APY
 
-区块提议（平均 1000 epochs 一次）:
-  额外收益:     1.64 ETH/年 = 5.13% APY
+区块提议（平均 33,125 epochs 一次，当前验证者数量）:
+  额外收益:     0.074 ETH/年 = 0.23% APY
+  （计算：82,125/33,125 × 0.03 ETH）
 
 执行层收益（优先费 + MEV）:
-  估算:         0.30 ETH/年 = 0.94% APY
+  估算:         0.35 ETH/年 = 1.09% APY
+
+同步委员会（偶尔被选中）:
+  平均:         0.01 ETH/年 = 0.03% APY
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-总年化收益:     ~2.08 ETH/年
-总 APY:         ~6.5%
-月收益:         ~0.173 ETH
-日收益:         ~0.0057 ETH
+总年化收益:     ~1.12 ETH/年
+总 APY:         ~3.5%
+月收益:         ~0.093 ETH
+日收益:         ~0.0031 ETH
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+注：实际APY取决于网络使用率和MEV市场，
+    牛市高使用期可达4.5%+
 ```
 
 **场景 2：偶尔离线验证者（95% 正确率）**
@@ -2348,21 +2443,21 @@ def calculate_inactivity_penalty(validator, network_state):
 验证者质押: 32 ETH
 参与情况: 95% 时间正确参与
 
-每 Epoch 平均收益:
-  95% epochs: 0.002109 ETH
-  5% epochs:  -0.001735 ETH (损失奖励 + 小额惩罚)
+每 Epoch 平均收益（Altair版本）:
+  95% epochs: 0.000008440 ETH（正常奖励）
+  5% epochs:  -0.000006940 ETH（损失奖励 + 小额惩罚）
   ─────────────────────────
-  平均:       0.001917 ETH/epoch
+  平均:       0.000007671 ETH/epoch
 
 年化收益:
-  共识层:     157.5 ETH/年 = 4.92% APY
-  区块提议:   1.64 ETH/年 = 5.13% APY
-  执行层:     0.30 ETH/年 = 0.94% APY
+  共识层证明: 0.630 ETH/年 = 1.97% APY
+  区块提议:   0.074 ETH/年 = 0.23% APY
+  执行层:     0.33 ETH/年 = 1.03% APY
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-总年化收益:   ~1.97 ETH/年
-总 APY:       ~6.2%
-相比完美:     -5% 收益损失
+总年化收益:   ~1.03 ETH/年
+总 APY:       ~3.2%
+相比完美:     -8.6% 收益损失
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -2372,16 +2467,25 @@ def calculate_inactivity_penalty(validator, network_state):
 验证者质押: 32 ETH
 参与情况: 80% 时间正确参与
 
+每 Epoch 平均收益:
+  80% epochs: 0.000008440 ETH
+  20% epochs: -0.000006940 ETH
+  ─────────────────────────
+  平均:       0.000005364 ETH/epoch
+
 年化收益:
-  共识层:     ~138 ETH/年 = 4.31% APY
-  区块提议:   1.31 ETH/年 = 4.09% APY
-  执行层:     0.30 ETH/年 = 0.94% APY
+  共识层证明: 0.440 ETH/年 = 1.38% APY
+  区块提议:   0.059 ETH/年 = 0.18% APY
+  执行层:     0.28 ETH/年 = 0.88% APY
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-总年化收益:   ~1.69 ETH/年
-总 APY:       ~5.3%
-相比完美:     -19% 收益损失
+总年化收益:   ~0.78 ETH/年
+总 APY:       ~2.4%
+相比完美:     -30.4% 收益损失
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+警告：80%参与率意味着严重的节点问题，
+      应立即检查并修复！
 ```
 
 ##### 5.3.8 关键设计特性
