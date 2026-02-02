@@ -1494,14 +1494,42 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 **年化发行率公式：**
 
 ```python
-# 基础奖励因子
-base_reward_factor = 64
+"""
+以太坊 PoS 发行模型 - 动态调整
+"""
 
-# 基础奖励（每个验证者每个 epoch）
-base_reward_per_validator = effective_balance * base_reward_factor / sqrt(total_balance)
+# === 核心常量 ===
+BASE_REWARD_FACTOR = 64              # 基础奖励因子
+BASE_REWARDS_PER_EPOCH = 4           # 每epoch基础奖励数
 
-# 年化发行率（简化）
-annual_issuance_rate = base_reward_factor / sqrt(total_staked_eth)
+# === 每个验证者的基础奖励计算 ===
+def calculate_base_reward(validator_effective_balance, total_active_balance):
+    """
+    计算单个验证者每 epoch 的基础奖励
+
+    参数:
+        validator_effective_balance: 验证者有效余额（通常32 ETH）
+        total_active_balance: 所有活跃验证者的总余额
+
+    返回:
+        base_reward: 每个epoch的基础奖励（Gwei）
+    """
+    sqrt_total_active_balance = sqrt(total_active_balance)
+
+    base_reward = (validator_effective_balance * BASE_REWARD_FACTOR) / \
+                  (sqrt_total_active_balance * BASE_REWARDS_PER_EPOCH)
+
+    return base_reward
+
+# === 网络年化发行率计算（简化） ===
+def calculate_annual_issuance_rate(total_staked_eth):
+    """
+    计算整个网络的年化发行率
+
+    质押量越高 → 发行率越高 → 但单个验证者APY越低
+    """
+    annual_issuance_rate = BASE_REWARD_FACTOR / sqrt(total_staked_eth)
+    return annual_issuance_rate
 ```
 
 **实际发行率示例：**
@@ -1583,13 +1611,36 @@ annual_issuance_rate = base_reward_factor / sqrt(total_staked_eth)
 **目标：保持区块 50% 满**
 
 ```python
-# 基础费用调整公式
-if current_block_gas_used > target_gas_used:
-    # 区块超过 50% 满，基础费用上涨
-    base_fee_next = base_fee_current * 1.125  # 最大上涨 12.5%
-else:
-    # 区块低于 50% 满，基础费用下降
-    base_fee_next = base_fee_current * 0.875  # 最大下降 12.5%
+"""
+EIP-1559 基础费用动态调整算法
+每个区块根据上一区块的使用率自动调整基础费用
+"""
+
+# === 核心参数 ===
+TARGET_GAS_USAGE = 15_000_000        # 目标：50% 满（15M / 30M）
+MAX_FEE_CHANGE = 0.125               # 每块最大变化：±12.5%
+
+def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
+
+    if gas_used_in_last_block > TARGET_GAS_USAGE:
+        # 区块使用超过 50% → 需求高 → 提高基础费用
+        next_base_fee = current_base_fee * (1 + MAX_FEE_CHANGE)
+        # 示例: 100 Gwei → 112.5 Gwei
+
+    elif gas_used_in_last_block < TARGET_GAS_USAGE:
+        # 区块使用低于 50% → 需求低 → 降低基础费用
+        next_base_fee = current_base_fee * (1 - MAX_FEE_CHANGE)
+        # 示例: 100 Gwei → 87.5 Gwei
+
+    else:
+        # 区块正好 50% 满 → 保持不变
+        next_base_fee = current_base_fee
+
+    return next_base_fee
+
+# === 实际效果 ===
+# 连续8个满区块 → 基础费用翻倍 (1.125^8 ≈ 2)
+# 连续8个空区块 → 基础费用减半 (0.875^8 ≈ 0.5)
 ```
 
 **特点：**
@@ -1765,12 +1816,38 @@ PROPOSER_WEIGHT: 8                        # 提议者额外权重 (12.5%)
 每个验证者每个 Epoch 的基础奖励是所有其他奖励的基础：
 
 ```python
-# 伪代码
+"""
+以太坊验证者基础奖励计算
+这是所有其他奖励（Source、Target、Head）的基础
+"""
+
+# === 主网核心参数 ===
+BASE_REWARD_FACTOR = 64              # 基础奖励因子
+BASE_REWARDS_PER_EPOCH = 4           # 每epoch基础奖励数
+EFFECTIVE_BALANCE_INCREMENT = 1e9    # 1 ETH = 1,000,000,000 Gwei
+
 def get_base_reward(validator_effective_balance, total_active_balance):
+    """
+    计算单个验证者的基础奖励（每 epoch）
+
+    参数:
+        validator_effective_balance: 验证者有效余额（Gwei，通常 32 ETH）
+        total_active_balance: 所有活跃验证者的总余额（Gwei）
+
+    返回:
+        base_reward: 该验证者每个 epoch 的基础奖励（Gwei）
+
+    关键逻辑:
+        - 有效余额越高 → 基础奖励越高（线性关系）
+        - 网络质押总量越高 → 基础奖励越低（平方根关系）
+        - 这确保了动态平衡：质押少时APY高，质押多时APY低
+    """
+    # 计算总余额的平方根
     sqrt_total_active_balance = sqrt(total_active_balance)
 
-    base_reward = (validator_effective_balance * base_reward_factor) / \
-                  (sqrt_total_active_balance * base_rewards_per_epoch)
+    # 基础奖励公式
+    base_reward = (validator_effective_balance * BASE_REWARD_FACTOR) / \
+                  (sqrt_total_active_balance * BASE_REWARDS_PER_EPOCH)
 
     return base_reward
 ```
@@ -1815,41 +1892,88 @@ Epoch N (32 个 slots)
 对于每个参与标志（Source、Target、Head），验证者如果正确参与且未被罚没，则获得奖励：
 
 ```python
-def get_flag_reward(validator_info, flag_index, rewards_context, state_context):
+"""
+以太坊验证者参与标志奖励计算
+验证者每个 epoch 需要对三个检查点投票
+"""
+
+# === 参与标志常量 ===
+TIMELY_SOURCE_FLAG = 0    # Source 检查点
+TIMELY_TARGET_FLAG = 1    # Target 检查点
+TIMELY_HEAD_FLAG = 2      # Head 区块
+
+# === 权重分配（总权重 64） ===
+FLAG_WEIGHTS = {
+    TIMELY_SOURCE_FLAG: 14,    # 21.875%
+    TIMELY_TARGET_FLAG: 26,    # 40.625%（最重要）
+    TIMELY_HEAD_FLAG: 14       # 21.875%
+}
+
+WEIGHT_DENOMINATOR = 64
+
+def calculate_participation_reward(validator_info, flag_index, network_state):
     """
-    计算特定参与标志的奖励
+    计算验证者某个参与标志的奖励或惩罚
 
     参数:
-        flag_index: 0=Source, 1=Target, 2=Head
-        rewards_context: 包含网络参与率信息
-        state_context: 包含网络状态信息
+        validator_info: 验证者信息
+            - base_reward: 基础奖励
+            - participated: 是否参与了该标志
+            - is_slashed: 是否被罚没
+        flag_index: 参与标志索引 (0=Source, 1=Target, 2=Head)
+        network_state: 网络状态
+            - participating_balance: 正确参与该标志的总余额
+            - total_active_balance: 总活跃余额
+            - is_inactivity_leak: 是否处于不活跃泄漏期
+
+    返回:
+        reward_or_penalty: 奖励（正数）或惩罚（负数），单位 Gwei
     """
+
     base_reward = validator_info.base_reward
-    weight = get_flag_weight(flag_index)  # 14, 26, or 14
+    weight = FLAG_WEIGHTS[flag_index]
 
-    # 计算正确参与该标志的验证者增量
-    unslashed_participating_increments = \
-        rewards_context.unslashed_participating_increments[flag_index]
+    # 计算参与率（以 1 ETH 增量为单位）
+    participating_increments = network_state.participating_balance // EFFECTIVE_BALANCE_INCREMENT
+    active_increments = network_state.total_active_balance // EFFECTIVE_BALANCE_INCREMENT
 
-    # 总活跃验证者增量
-    active_increments = rewards_context.active_increments
+    # === 情况 1: 验证者正确参与且未被罚没 ===
+    if validator_info.participated[flag_index] and not validator_info.is_slashed:
 
-    # 验证者是否正确参与
-    if validator_info.is_unslashed_participating(flag_index):
-        if not state_context.is_in_inactivity_leak:
-            # 正常情况：获得奖励
-            reward_numerator = base_reward * weight * unslashed_participating_increments
-            reward = reward_numerator / (active_increments * WEIGHT_DENOMINATOR)
+        if not network_state.is_inactivity_leak:
+            # 正常情况：获得奖励（基于网络参与率）
+            reward_numerator = base_reward * weight * participating_increments
+            reward = reward_numerator // (active_increments * WEIGHT_DENOMINATOR)
             return reward
+            # 参与率越高 → 奖励越高（激励大家都参与）
+
         else:
-            # 不活跃泄漏期：不获得奖励
+            # 不活跃泄漏期：不获得奖励（但也不惩罚）
             return 0
+
+    # === 情况 2: 验证者未参与 ===
     else:
-        # 未参与：受到惩罚（Head 除外）
-        if flag_index != TIMELY_HEAD_FLAG_INDEX:
-            penalty = (base_reward * weight) / WEIGHT_DENOMINATOR
-            return -penalty
-        return 0
+        # Head 标志特殊：不参与不惩罚
+        if flag_index == TIMELY_HEAD_FLAG:
+            return 0
+
+        # Source 和 Target：不参与会被惩罚
+        penalty = (base_reward * weight) // WEIGHT_DENOMINATOR
+        return -penalty
+
+# === 完整 epoch 奖励示例 ===
+def calculate_total_epoch_reward(validator_info, network_state):
+    """
+    计算验证者一个 epoch 的总奖励
+    """
+    total_reward = 0
+
+    # 累加三个参与标志的奖励
+    for flag_index in [TIMELY_SOURCE_FLAG, TIMELY_TARGET_FLAG, TIMELY_HEAD_FLAG]:
+        reward = calculate_participation_reward(validator_info, flag_index, network_state)
+        total_reward += reward
+
+    return total_reward
 ```
 
 **具体示例计算：**
@@ -1921,20 +2045,61 @@ penalty = 0  ⚠️ Head 不惩罚！
 当验证者被选中提议区块时（随机选择，平均每 ~N epochs 一次，N = 验证者总数 / 32），会获得额外奖励：
 
 ```python
-def get_proposer_reward(attestations_included):
-    """
-    计算提议者因包含证明而获得的奖励
+"""
+区块提议者额外奖励
+提议者通过包含其他验证者的证明获得额外收益
+"""
 
-    提议者获得被包含证明者基础奖励的 1/8
-    """
-    proposer_reward = 0
+# === 提议者权重 ===
+PROPOSER_WEIGHT = 8              # 提议者获得 8/64 = 1/8
+WEIGHT_DENOMINATOR = 64
 
-    for attestation in attestations_included:
+def calculate_proposer_reward(included_attestations):
+    """
+    计算区块提议者的额外奖励
+
+    参数:
+        included_attestations: 提议区块中包含的所有证明列表
+            - 每个证明包含多个参与的验证者
+
+    返回:
+        total_proposer_reward: 提议者获得的总额外奖励
+
+    核心机制:
+        提议者从每个被包含证明的参与者基础奖励中获得 1/8
+        这激励提议者：
+        1. 包含尽可能多的有效证明
+        2. 及时提议区块（延迟会导致证明过期）
+    """
+    total_proposer_reward = 0
+
+    # 遍历区块中包含的所有证明
+    for attestation in included_attestations:
+        # 遍历每个证明中的所有参与验证者
         for attester in attestation.participants:
-            attester_base_reward = get_base_reward(attester)
-            proposer_reward += attester_base_reward * PROPOSER_WEIGHT / WEIGHT_DENOMINATOR
 
-    return proposer_reward  # 约为基础奖励的 1/8
+            # 获取该证明者的基础奖励
+            attester_base_reward = get_base_reward(
+                attester.effective_balance,
+                network.total_active_balance
+            )
+
+            # 提议者从中获得 1/8
+            proposer_share = (attester_base_reward * PROPOSER_WEIGHT) // WEIGHT_DENOMINATOR
+            total_proposer_reward += proposer_share
+
+    return total_proposer_reward
+
+# === 示例：满区块的提议者奖励 ===
+# 假设一个满区块:
+# - 包含 128 个证明
+# - 每个证明有 256 个参与者
+# - 每个验证者基础奖励 2,777,000 Gwei
+#
+# 总参与者 = 128 * 256 = 32,768
+# 提议者奖励 = 32,768 * 2,777,000 * (8/64)
+#           = 10,240,000 Gwei
+#           ≈ 0.01 ETH per block
 ```
 
 **提议者奖励示例：**
@@ -1960,20 +2125,58 @@ def get_proposer_reward(attestations_included):
 验证者有约 2 年一次的机会被选入同步委员会（512 个验证者，任期 256 epochs）：
 
 ```python
-def get_sync_committee_reward(total_active_balance, base_reward_per_increment):
-    """
-    同步委员会参与者奖励
-    """
-    total_active_increments = total_active_balance / effective_balance_increment
-    total_base_rewards = base_reward_per_increment * total_active_increments
+"""
+同步委员会奖励计算
+同步委员会帮助轻客户端快速同步链状态
+"""
 
-    max_participant_rewards = total_base_rewards * SYNC_REWARD_WEIGHT / WEIGHT_DENOMINATOR
-    participant_reward = max_participant_rewards / SYNC_COMMITTEE_SIZE
+# === 同步委员会参数 ===
+SYNC_COMMITTEE_SIZE = 512        # 委员会成员数
+SYNC_REWARD_WEIGHT = 2           # 权重 2/64 = 3.125%
+PROPOSER_WEIGHT = 8              # 提议者权重 8/64 = 12.5%
+WEIGHT_DENOMINATOR = 64
 
-    # 提议者获得参与者奖励的 1/8
-    proposer_reward = participant_reward * PROPOSER_WEIGHT / WEIGHT_DENOMINATOR
+def calculate_sync_committee_reward(network_state):
+    """
+    计算同步委员会参与者的奖励
+
+    参数:
+        network_state: 网络状态
+            - total_active_balance: 总活跃余额
+            - base_reward_per_increment: 每增量基础奖励
+
+    返回:
+        participant_reward: 每个参与者的奖励
+        proposer_reward: 提议者从同步聚合中获得的奖励
+
+    机制说明:
+        - 每个 epoch 选出 512 个验证者组成同步委员会
+        - 任期 256 epochs（约 27 小时）
+        - 每个 slot 委员会成员需要签名当前 head
+    """
+
+    # 计算网络总增量（以 1 ETH 为单位）
+    total_active_increments = network_state.total_active_balance // EFFECTIVE_BALANCE_INCREMENT
+
+    # 计算网络总基础奖励
+    total_base_rewards = network_state.base_reward_per_increment * total_active_increments
+
+    # 计算同步委员会总奖励池
+    max_sync_rewards = (total_base_rewards * SYNC_REWARD_WEIGHT) // WEIGHT_DENOMINATOR
+
+    # 平均分配给 512 个参与者
+    participant_reward = max_sync_rewards // SYNC_COMMITTEE_SIZE
+
+    # 提议者从同步聚合中获得额外奖励
+    proposer_reward = (participant_reward * PROPOSER_WEIGHT) // WEIGHT_DENOMINATOR
 
     return participant_reward, proposer_reward
+
+# === 同步委员会收益示例 ===
+# 如果被选中（约2年一次）:
+# - 每 epoch 额外奖励: ~0.0002 ETH
+# - 任期 256 epochs 总奖励: ~0.05 ETH
+# - 年化影响（平均分摊）: +0.02% APY
 ```
 
 **同步委员会奖励示例：**
@@ -1991,36 +2194,98 @@ def get_sync_committee_reward(total_active_balance, base_reward_per_increment):
 当验证者未能参与 Target 投票时，会累积不活跃分数：
 
 ```python
-def update_inactivity_score(validator, state_context):
+"""
+不活跃分数与惩罚机制
+当验证者离线时，会累积不活跃分数并受到惩罚
+"""
+
+# === 不活跃惩罚参数 ===
+INACTIVITY_SCORE_BIAS = 4              # 未参与时分数增加量
+INACTIVITY_SCORE_RECOVERY_RATE = 16   # 正常期恢复速率
+INACTIVITY_PENALTY_QUOTIENT = 2**24   # 16,777,216（惩罚商）
+
+def update_inactivity_score(validator, network_state):
     """
-    更新验证者的不活跃分数
+    每个 epoch 更新验证者的不活跃分数
+
+    参数:
+        validator: 验证者信息
+            - inactivity_score: 当前不活跃分数
+            - participated_in_target: 是否参与了 Target 投票
+        network_state: 网络状态
+            - is_inactivity_leak: 网络是否处于不活跃泄漏期
+
+    返回:
+        new_inactivity_score: 更新后的不活跃分数
+
+    分数变化规则:
+        - 参与 Target 投票: 分数 -1
+        - 未参与 Target 投票: 分数 +4
+        - 非泄漏期: 额外恢复 -16（快速归零）
+        - 泄漏期: 不额外恢复（分数持续累积）
     """
+    current_score = validator.inactivity_score
+
+    # === 基础变化 ===
     if validator.participated_in_target:
-        # 参与了 Target 投票：分数减 1
-        inactivity_score = max(0, inactivity_score - 1)
+        # 参与了 Target 投票 → 分数减少
+        new_score = max(0, current_score - 1)
     else:
-        # 未参与 Target 投票：分数加 4
-        inactivity_score += INACTIVITY_SCORE_BIAS  # 4
+        # 未参与 Target 投票 → 分数增加
+        new_score = current_score + INACTIVITY_SCORE_BIAS
 
-    # 非泄漏期：额外恢复
-    if not state_context.is_in_inactivity_leak:
-        recovery = min(INACTIVITY_SCORE_RECOVERY_RATE, inactivity_score)  # 16
-        inactivity_score -= recovery
+    # === 非泄漏期的快速恢复 ===
+    if not network_state.is_inactivity_leak:
+        # 在线验证者快速恢复到 0
+        recovery = min(INACTIVITY_SCORE_RECOVERY_RATE, new_score)
+        new_score = new_score - recovery
 
-    return inactivity_score
+    return new_score
 
-def get_inactivity_penalty(validator, inactivity_score, state_context):
+def calculate_inactivity_penalty(validator, network_state):
     """
-    计算不活跃惩罚
-    """
-    if not validator.participated_in_target:
-        penalty_numerator = validator.effective_balance * inactivity_score
-        penalty_denominator = INACTIVITY_SCORE_BIAS * INACTIVITY_PENALTY_QUOTIENT
-        # INACTIVITY_PENALTY_QUOTIENT = 2^24 = 16,777,216
+    计算基于不活跃分数的惩罚
 
-        penalty = penalty_numerator / penalty_denominator
-        return penalty
-    return 0
+    参数:
+        validator: 验证者信息
+            - effective_balance: 有效余额
+            - inactivity_score: 不活跃分数
+            - participated_in_target: 是否参与 Target 投票
+        network_state: 网络状态
+
+    返回:
+        penalty: 不活跃惩罚金额（Gwei）
+
+    惩罚机制:
+        - 只有未参与 Target 的验证者才受惩罚
+        - 惩罚与不活跃分数成正比
+        - 不活跃泄漏期惩罚显著增加
+    """
+    # 只有未参与 Target 的才惩罚
+    if validator.participated_in_target:
+        return 0
+
+    # 计算惩罚
+    penalty_numerator = validator.effective_balance * validator.inactivity_score
+    penalty_denominator = INACTIVITY_SCORE_BIAS * INACTIVITY_PENALTY_QUOTIENT
+
+    penalty = penalty_numerator // penalty_denominator
+
+    return penalty
+
+# === 示例：不同离线时长的影响 ===
+# 短期离线（几个 epoch）:
+#   - 分数快速恢复
+#   - 主要损失：错过的奖励
+#
+# 长期离线（数天）:
+#   - 分数持续累积
+#   - 额外惩罚：基于累积分数
+#
+# 不活跃泄漏期（网络无法最终化）:
+#   - 分数无法恢复
+#   - 二次惩罚生效
+#   - 目的：迫使离线验证者退出
 ```
 
 **不活跃惩罚示例：**
