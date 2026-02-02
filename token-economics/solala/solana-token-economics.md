@@ -1318,9 +1318,9 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 
 - [一、总览](#一总览-1)
 - [二、供应机制](#二供应机制-1)
-- [三、通胀与通缩机制](#三通胀与通缩机制)
-- [四、EIP-1559 费用机制](#四eip-1559-费用机制)
-- [五、质押机制（PoS）](#五质押机制pos)
+- [三、发行与通缩机制](#三发行与通缩机制)
+- [四、费用与燃烧机制](#四费用与燃烧机制)
+- [五、质押设计](#五质押设计)
 - [六、经济安全性](#六经济安全性-1)
 - [七、未来展望](#七未来展望-1)
 
@@ -1479,7 +1479,27 @@ The Merge后（2022-现在）：
 
 ### 二、供应机制
 
-#### 2.1 历史供应演变
+#### 2.1 创世分配
+
+以太坊在 **2015 年 7 月** 的创世区块分配了初始供应：
+
+**总量：约 72,000,000 ETH**
+
+**分配结构：**
+
+| 类别 | 数量 | 百分比 | 说明 |
+|------|------|--------|------|
+| **ICO 投资者** | ~60,000,000 ETH | 83.3% | 2014 年众筹，约 $18M |
+| **早期贡献者和基金会** | ~12,000,000 ETH | 16.7% | 开发者和以太坊基金会 |
+
+**特点：**
+
+- ✅ 无风投或私募轮次
+- ✅ 公开众筹，公平分配
+- ✅ 早期贡献者奖励较为合理
+- ✅ 无预留大量团队代币
+
+#### 2.2 历史供应演变
 
 以太坊的供应机制经历了多个重要阶段：
 
@@ -1514,27 +1534,7 @@ The Merge后（2022-现在）：
 2024+   ▶ 动态供应：根据网络使用通缩或微通胀
 ```
 
-#### 2.2 创世分配
-
-以太坊在 **2015 年 7 月** 的创世区块分配了初始供应：
-
-**总量：约 72,000,000 ETH**
-
-**分配结构：**
-
-| 类别 | 数量 | 百分比 | 说明 |
-|------|------|--------|------|
-| **ICO 投资者** | ~60,000,000 ETH | 83.3% | 2014 年众筹，约 $18M |
-| **早期贡献者和基金会** | ~12,000,000 ETH | 16.7% | 开发者和以太坊基金会 |
-
-**特点：**
-
-- ✅ 无风投或私募轮次
-- ✅ 公开众筹，公平分配
-- ✅ 早期贡献者奖励较为合理
-- ✅ 无预留大量团队代币
-
-#### 2.3 当前供应状态
+#### 2.3 当前供应
 
 **实时供应数据**（示例 - 2025 年初数据）：
 
@@ -1564,7 +1564,7 @@ The Merge后（2022-现在）：
 1. **EIP-1559 燃烧**：每笔交易的基础费用被永久销毁（主要来源）
 2. **罚没（Slashing）**：验证者作恶被惩罚销毁的 ETH
 
-#### 2.4 未来供应预测
+#### 2.4 供应预测
 
 **供应模型：**
 
@@ -1601,7 +1601,7 @@ The Merge后（2022-现在）：
 
 ---
 
-### 三、通胀与通缩机制
+### 三、发行与通缩机制
 
 #### 3.1 PoS 发行模型
 
@@ -1643,7 +1643,39 @@ annual_issuance_rate = base_reward_factor / sqrt(total_staked_eth)
 - 年发行量: ~720K ETH
 - 年发行率: ~0.6%
 
-#### 3.2 EIP-1559 燃烧机制
+#### 3.2 净供应变化分析
+
+**净通胀率 = 发行率 - 燃烧率**
+
+**历史净通胀率：**
+
+| 时期 | 发行率 | 燃烧率 | 净通胀率 | 状态 |
+|------|--------|--------|---------|------|
+| **Pre-EIP-1559** (2015-2021) | ~4% | 0% | +4% | 通胀 |
+| **EIP-1559 + PoW** (2021-2022) | ~4% | ~0.5-1% | +3-3.5% | 通胀 |
+| **Post-Merge 低使用** (2022+) | ~0.6% | ~0.2% | +0.4% | 微通胀 |
+| **Post-Merge 中等使用** | ~0.6% | ~0.5% | +0.1% | 接近零 |
+| **Post-Merge 高使用** | ~0.6% | ~1.5%+ | **-0.9%** | **通缩** |
+
+**实际案例（2024-2025）：**
+
+```text
+2024 年部分时间段实现净通缩：
+- 牛市期间，DeFi 和 NFT 活跃
+- Gas 价格上涨，燃烧量增加
+- 燃烧率 > 发行率，供应下降
+
+2024 年低活动时期轻微通胀：
+- 熊市期间，链上活动减少
+- Gas 价格降低，燃烧量减少
+- 发行率 > 燃烧率，供应微增
+```
+
+---
+
+### 四、费用与燃烧机制
+
+#### 4.1 EIP-1559 费用市场
 
 **EIP-1559 概述：**
 
@@ -1682,39 +1714,7 @@ annual_issuance_rate = base_reward_factor / sqrt(total_staked_eth)
 - 📊 [Ultrasound.Money](https://ultrasound.money/) - 实时燃烧数据
 - 📊 [Watch The Burn](https://watchtheburn.com/)
 
-#### 3.3 净供应变化分析
-
-**净通胀率 = 发行率 - 燃烧率**
-
-**历史净通胀率：**
-
-| 时期 | 发行率 | 燃烧率 | 净通胀率 | 状态 |
-|------|--------|--------|---------|------|
-| **Pre-EIP-1559** (2015-2021) | ~4% | 0% | +4% | 通胀 |
-| **EIP-1559 + PoW** (2021-2022) | ~4% | ~0.5-1% | +3-3.5% | 通胀 |
-| **Post-Merge 低使用** (2022+) | ~0.6% | ~0.2% | +0.4% | 微通胀 |
-| **Post-Merge 中等使用** | ~0.6% | ~0.5% | +0.1% | 接近零 |
-| **Post-Merge 高使用** | ~0.6% | ~1.5%+ | **-0.9%** | **通缩** |
-
-**实际案例（2024-2025）：**
-
-```text
-2024 年部分时间段实现净通缩：
-- 牛市期间，DeFi 和 NFT 活跃
-- Gas 价格上涨，燃烧量增加
-- 燃烧率 > 发行率，供应下降
-
-2024 年低活动时期轻微通胀：
-- 熊市期间，链上活动减少
-- Gas 价格降低，燃烧量减少
-- 发行率 > 燃烧率，供应微增
-```
-
----
-
-### 四、EIP-1559 费用机制
-
-#### 4.1 基础费用动态调整
+#### 4.2 基础费用动态调整
 
 **目标：保持区块 50% 满**
 
@@ -1735,7 +1735,7 @@ else:
 - ✅ 每个区块最多变化 ±12.5%
 - ✅ 用户可预测下一区块费用
 
-#### 4.2 费用市场改善
+#### 4.3 费用市场改善
 
 **EIP-1559 前后对比：**
 
@@ -1747,7 +1747,7 @@ else:
 | **供应影响** | 无 | 基础费用燃烧，通缩压力 |
 | **拥堵处理** | 盲目竞价 | 费用自动调整 |
 
-#### 4.3 实际燃烧案例
+#### 4.4 实际燃烧案例
 
 **高燃烧量应用（历史数据）：**
 
@@ -1760,7 +1760,7 @@ else:
 
 ---
 
-### 五、质押机制（PoS）
+### 五、质押设计
 
 #### 5.1 质押概述
 
@@ -1852,7 +1852,452 @@ else:
 日收益: ~0.0033 ETH
 ```
 
-#### 5.3 罚没机制（Slashing）
+#### 5.3 验证者奖励算法详解
+
+> 基于 Lighthouse 客户端源码分析的 Altair+ 版本奖励机制
+
+以太坊在 Altair 升级后采用了高效的**单次遍历（Single Pass）奖励计算算法**，每个 Epoch（约 6.4 分钟）结算一次所有验证者的奖励和惩罚。
+
+##### 5.3.1 核心参数与常量
+
+**时间参数：**
+
+```text
+1 Slot    = 12 秒
+1 Epoch   = 32 Slots = 384 秒 ≈ 6.4 分钟
+1 年      ≈ 82,125 Epochs
+```
+
+**基础常量（主网配置）：**
+
+```yaml
+base_reward_factor: 64                    # 基础奖励因子
+base_rewards_per_epoch: 4                 # 每 epoch 基础奖励数
+effective_balance_increment: 1 ETH        # 有效余额增量单位
+WEIGHT_DENOMINATOR: 64                    # 权重分母
+
+# 参与标志权重分配
+TIMELY_SOURCE_WEIGHT: 14                  # Source 投票权重 (21.875%)
+TIMELY_TARGET_WEIGHT: 26                  # Target 投票权重 (40.625%)
+TIMELY_HEAD_WEIGHT: 14                    # Head 投票权重 (21.875%)
+SYNC_REWARD_WEIGHT: 2                     # 同步委员会权重 (3.125%)
+PROPOSER_WEIGHT: 8                        # 提议者额外权重 (12.5%)
+```
+
+**权重分配图示：**
+
+```text
+┌─────────────────────────────────────────────┐
+│      总权重 64 的分配（100%）                │
+├─────────────────────────────────────────────┤
+│  Target 投票   [████████████░░░░] 26/64 (40.625%) │
+│  Source 投票   [██████░░░░░░░░░░] 14/64 (21.875%) │
+│  Head 投票     [██████░░░░░░░░░░] 14/64 (21.875%) │
+│  提议者额外    [████░░░░░░░░░░░░]  8/64 (12.500%) │
+│  同步委员会    [█░░░░░░░░░░░░░░░]  2/64 (3.125%)  │
+└─────────────────────────────────────────────┘
+```
+
+##### 5.3.2 基础奖励计算
+
+**第一步：计算基础奖励**
+
+每个验证者每个 Epoch 的基础奖励是所有其他奖励的基础：
+
+```python
+# 伪代码
+def get_base_reward(validator_effective_balance, total_active_balance):
+    sqrt_total_active_balance = sqrt(total_active_balance)
+
+    base_reward = (validator_effective_balance * base_reward_factor) / \
+                  (sqrt_total_active_balance * base_rewards_per_epoch)
+
+    return base_reward
+```
+
+**计算示例：**
+
+```text
+假设条件：
+- 验证者有效余额: 32 ETH = 32,000,000,000 Gwei
+- 总活跃余额: 34,000,000 ETH = 34,000,000,000,000,000 Gwei
+- √总活跃余额: √34,000,000,000,000,000 ≈ 184,390,889 Gwei
+
+基础奖励计算：
+= (32,000,000,000 × 64) / (184,390,889 × 4)
+= 2,048,000,000,000 / 737,563,556
+≈ 2,777,000 Gwei
+≈ 0.002777 ETH per epoch
+
+年化基础奖励：
+= 0.002777 × 82,125 epochs
+≈ 228 ETH/年（理论最大值，需乘以权重比例）
+```
+
+##### 5.3.3 证明奖励详细计算
+
+验证者每个 Epoch 投票一次，需要正确标记三个参与标志：
+
+**投票时机：**
+
+```text
+Epoch N (32 个 slots)
+├─ 验证者被分配到某个特定 slot（如 Slot 15）
+├─ 在该 slot 发布证明（attestation）
+└─ 证明内容：
+    ├─ Source 检查点（上个已确定的 epoch）
+    ├─ Target 检查点（当前 epoch）
+    └─ Head 区块（最新的区块头）
+```
+
+**第二步：计算参与标志奖励**
+
+对于每个参与标志（Source、Target、Head），验证者如果正确参与且未被罚没，则获得奖励：
+
+```python
+def get_flag_reward(validator_info, flag_index, rewards_context, state_context):
+    """
+    计算特定参与标志的奖励
+
+    参数:
+        flag_index: 0=Source, 1=Target, 2=Head
+        rewards_context: 包含网络参与率信息
+        state_context: 包含网络状态信息
+    """
+    base_reward = validator_info.base_reward
+    weight = get_flag_weight(flag_index)  # 14, 26, or 14
+
+    # 计算正确参与该标志的验证者增量
+    unslashed_participating_increments = \
+        rewards_context.unslashed_participating_increments[flag_index]
+
+    # 总活跃验证者增量
+    active_increments = rewards_context.active_increments
+
+    # 验证者是否正确参与
+    if validator_info.is_unslashed_participating(flag_index):
+        if not state_context.is_in_inactivity_leak:
+            # 正常情况：获得奖励
+            reward_numerator = base_reward * weight * unslashed_participating_increments
+            reward = reward_numerator / (active_increments * WEIGHT_DENOMINATOR)
+            return reward
+        else:
+            # 不活跃泄漏期：不获得奖励
+            return 0
+    else:
+        # 未参与：受到惩罚（Head 除外）
+        if flag_index != TIMELY_HEAD_FLAG_INDEX:
+            penalty = (base_reward * weight) / WEIGHT_DENOMINATOR
+            return -penalty
+        return 0
+```
+
+**具体示例计算：**
+
+```text
+假设条件：
+- 基础奖励: 2,777,000 Gwei
+- 网络参与率: 90% 的验证者正确参与
+- 总活跃增量: 34,000,000 increments
+- 参与增量: 30,600,000 increments (90%)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Target 投票奖励（权重 26）：
+
+如果正确参与：
+reward = (2,777,000 × 26 × 30,600,000) / (34,000,000 × 64)
+       = 2,215,272,000,000,000 / 2,176,000,000,000
+       ≈ 1,018,000 Gwei
+       ≈ 0.001018 ETH
+
+如果未参与：
+penalty = (2,777,000 × 26) / 64
+        = 1,127,000 Gwei
+        ≈ 0.001127 ETH
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. Source 投票奖励（权重 14）：
+
+如果正确参与：
+reward = (2,777,000 × 14 × 30,600,000) / (34,000,000 × 64)
+       ≈ 548,000 Gwei
+       ≈ 0.000548 ETH
+
+如果未参与：
+penalty = (2,777,000 × 14) / 64
+        ≈ 607,000 Gwei
+        ≈ 0.000607 ETH
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. Head 投票奖励（权重 14）：
+
+如果正确参与：
+reward ≈ 548,000 Gwei
+       ≈ 0.000548 ETH
+
+如果未参与：
+penalty = 0  ⚠️ Head 不惩罚！
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+总计（完美表现，90% 网络参与率）：
+
+每 Epoch 奖励 = 1,018,000 + 548,000 + 548,000
+               = 2,114,000 Gwei
+               ≈ 0.002114 ETH
+
+年化收益 = 0.002114 × 82,125
+         ≈ 173.5 ETH/年
+         ≈ 5.4% APY（基于 32 ETH）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+##### 5.3.4 区块提议者额外奖励
+
+当验证者被选中提议区块时（随机选择，平均每 ~N epochs 一次，N = 验证者总数 / 32），会获得额外奖励：
+
+```python
+def get_proposer_reward(attestations_included):
+    """
+    计算提议者因包含证明而获得的奖励
+
+    提议者获得被包含证明者基础奖励的 1/8
+    """
+    proposer_reward = 0
+
+    for attestation in attestations_included:
+        for attester in attestation.participants:
+            attester_base_reward = get_base_reward(attester)
+            proposer_reward += attester_base_reward * PROPOSER_WEIGHT / WEIGHT_DENOMINATOR
+
+    return proposer_reward  # 约为基础奖励的 1/8
+```
+
+**提议者奖励示例：**
+
+```text
+假设一个满区块包含了 ~128 个证明，每个证明包含 ~256 个验证者：
+
+总参与验证者 ≈ 128 × 256 = 32,768 个
+
+提议者奖励 = Σ(每个证明者基础奖励) × 8/64
+           = 32,768 × 2,777,000 × (8/64)
+           = 10,240,000 Gwei
+           ≈ 0.01024 ETH per block
+
+年化影响（假设平均 1000 epochs 提议一次）：
+= 0.01024 × (82,125 / 1000)
+≈ 0.84 ETH/年
+≈ 2.6% 额外 APY
+```
+
+##### 5.3.5 同步委员会奖励
+
+验证者有约 2 年一次的机会被选入同步委员会（512 个验证者，任期 256 epochs）：
+
+```python
+def get_sync_committee_reward(total_active_balance, base_reward_per_increment):
+    """
+    同步委员会参与者奖励
+    """
+    total_active_increments = total_active_balance / effective_balance_increment
+    total_base_rewards = base_reward_per_increment * total_active_increments
+
+    max_participant_rewards = total_base_rewards * SYNC_REWARD_WEIGHT / WEIGHT_DENOMINATOR
+    participant_reward = max_participant_rewards / SYNC_COMMITTEE_SIZE
+
+    # 提议者获得参与者奖励的 1/8
+    proposer_reward = participant_reward * PROPOSER_WEIGHT / WEIGHT_DENOMINATOR
+
+    return participant_reward, proposer_reward
+```
+
+**同步委员会奖励示例：**
+
+```text
+被选入同步委员会时（512 个位置，256 epochs 任期）：
+
+每 epoch 额外奖励 ≈ 0.0002 ETH
+任期总奖励（256 epochs）≈ 0.05 ETH
+年化影响（平均分摊）≈ +0.02% APY
+```
+
+##### 5.3.6 不活跃惩罚
+
+当验证者未能参与 Target 投票时，会累积不活跃分数：
+
+```python
+def update_inactivity_score(validator, state_context):
+    """
+    更新验证者的不活跃分数
+    """
+    if validator.participated_in_target:
+        # 参与了 Target 投票：分数减 1
+        inactivity_score = max(0, inactivity_score - 1)
+    else:
+        # 未参与 Target 投票：分数加 4
+        inactivity_score += INACTIVITY_SCORE_BIAS  # 4
+
+    # 非泄漏期：额外恢复
+    if not state_context.is_in_inactivity_leak:
+        recovery = min(INACTIVITY_SCORE_RECOVERY_RATE, inactivity_score)  # 16
+        inactivity_score -= recovery
+
+    return inactivity_score
+
+def get_inactivity_penalty(validator, inactivity_score, state_context):
+    """
+    计算不活跃惩罚
+    """
+    if not validator.participated_in_target:
+        penalty_numerator = validator.effective_balance * inactivity_score
+        penalty_denominator = INACTIVITY_SCORE_BIAS * INACTIVITY_PENALTY_QUOTIENT
+        # INACTIVITY_PENALTY_QUOTIENT = 2^24 = 16,777,216
+
+        penalty = penalty_numerator / penalty_denominator
+        return penalty
+    return 0
+```
+
+**不活跃惩罚示例：**
+
+```text
+正常情况（非泄漏期）：
+- 错过 1 个 epoch：损失正常奖励，分数 +4，然后 -16（立即恢复）
+- 几乎无额外惩罚
+
+长期离线（数天）：
+- 分数持续累积
+- 假设离线 100 epochs，未进入泄漏期：
+  - 损失的奖励：100 × 0.002114 ≈ 0.21 ETH
+  - 不活跃惩罚（分数约 400）：
+    penalty = (32 ETH × 400) / (4 × 16,777,216)
+            ≈ 0.00019 ETH
+  - 总损失：≈ 0.21 ETH（主要是错过的奖励）
+
+不活跃泄漏期（网络无法最终化 >4 epochs）：
+- 二次惩罚开始生效
+- 目的：迫使离线验证者退出，恢复网络最终性
+- 惩罚可能累积到有效余额的大部分
+```
+
+##### 5.3.7 完整收益计算示例
+
+**场景 1：完美在线验证者（100% 正确率，90% 网络参与率）**
+
+```yaml
+验证者质押: 32 ETH
+网络状态: 34M ETH 总质押，90% 参与率
+
+每 Epoch 收益:
+  Source 奖励:  0.000548 ETH
+  Target 奖励:  0.001018 ETH
+  Head 奖励:    0.000548 ETH
+  ─────────────────────────
+  共识层小计:   0.002114 ETH/epoch
+
+年化收益 (82,125 epochs):
+  共识层:       173.5 ETH/年 = 5.42% APY
+
+区块提议（平均 1000 epochs 一次）:
+  额外收益:     0.84 ETH/年 = 2.63% APY
+
+执行层收益（优先费 + MEV）:
+  估算:         0.30 ETH/年 = 0.94% APY
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+总年化收益:     ~1.14 ETH/年
+总 APY:         ~3.56%
+月收益:         ~0.095 ETH
+日收益:         ~0.0031 ETH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**场景 2：偶尔离线验证者（95% 正确率）**
+
+```yaml
+验证者质押: 32 ETH
+参与情况: 95% 时间正确参与
+
+每 Epoch 平均收益:
+  95% epochs: 0.002114 ETH
+  5% epochs:  -0.001734 ETH (损失奖励 + 小额惩罚)
+  ─────────────────────────
+  平均:       0.001921 ETH/epoch
+
+年化收益:
+  共识层:     157.7 ETH/年 = 4.93% APY
+  执行层:     0.30 ETH/年 = 0.94% APY
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+总年化收益:   ~1.02 ETH/年
+总 APY:       ~3.19%
+相比完美:     -10% 收益损失
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**场景 3：表现不佳验证者（80% 正确率）**
+
+```yaml
+验证者质押: 32 ETH
+参与情况: 80% 时间正确参与
+
+年化收益:
+  共识层:     ~126 ETH/年 = 3.94% APY
+  执行层:     0.30 ETH/年 = 0.94% APY
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+总 APY:       ~2.69%
+相比完美:     -24% 收益损失
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+##### 5.3.8 关键设计特性
+
+**1. 基于参与率的动态奖励**
+
+```text
+网络参与率 ↑ → 单个验证者奖励 ↑
+这激励验证者保持在线，因为当其他人离线时，在线者获得更多奖励
+```
+
+**2. 有效余额增量（1 ETH）简化计算**
+
+```text
+所有余额以 1 ETH 为单位取整
+32.7 ETH → 32 ETH 有效余额
+避免频繁更新状态，提高效率
+```
+
+**3. 投票频率与奖励结算**
+
+```text
+投票: 每个 Epoch 投票 1 次（被分配到 32 个 slots 之一）
+结算: 每个 Epoch 结束时统一结算所有验证者
+时间: 每 ~6.4 分钟一次
+```
+
+**4. Target 权重最高（40.625%）**
+
+```text
+Target 投票对网络最终性至关重要
+获得最高权重激励
+未参与会受到惩罚（Source 和 Target 都惩罚，Head 不惩罚）
+```
+
+**5. 提议者与证明者收益平衡**
+
+```text
+证明者: 持续稳定的小额奖励
+提议者: 偶尔的较大额外奖励
+长期平均后收益相近
+```
+
+#### 5.4 罚没机制（Slashing）
 
 **什么会导致 Slashing？**
 
@@ -1887,7 +2332,7 @@ else:
 - ❌ 长期离线（数天）：逐渐增加的惩罚
 - ❌ 网络最终性停止（>4 epochs）：严重的二次惩罚（Inactivity Leak）
 
-#### 5.4 质押激活与退出
+#### 5.5 质押激活与退出
 
 **激活流程：**
 
