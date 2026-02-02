@@ -1689,17 +1689,6 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 | **供应影响** | 无 | 基础费用燃烧，通缩压力 |
 | **拥堵处理** | 盲目竞价 | 费用自动调整 |
 
-#### 4.4 实际燃烧案例
-
-**高燃烧量应用（历史数据）：**
-
-| 应用/协议 | 累计燃烧 ETH | 说明 |
-|----------|------------|------|
-| **OpenSea** | ~230,000+ | NFT 交易市场 |
-| **Uniswap** | ~580,000+ | 去中心化交易所 |
-| **ETH 转账** | ~340,000+ | 简单转账 |
-| **Tether (USDT)** | ~260,000+ | 稳定币转账 |
-
 ---
 
 ### 五、质押设计
@@ -1796,8 +1785,6 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 
 #### 5.3 验证者奖励算法详解
 
-> **重要说明：** 以下奖励机制基于 **Altair 升级后的规范**（2021年10月），与Phase 0（2020-2021）的计算方式不同。Altair移除了`BASE_REWARDS_PER_EPOCH`常量，改用基于增量的计算方式。
-
 ##### 5.3.1 核心参数与常量
 
 **时间参数：**
@@ -1808,7 +1795,7 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 1 年      ≈ 82,125 Epochs
 ```
 
-**基础常量（Altair版本）：**
+**基础常量：**
 
 ```yaml
 BASE_REWARD_FACTOR: 64                    # 基础奖励因子
@@ -1837,25 +1824,23 @@ PROPOSER_WEIGHT: 8                        # 提议者额外权重 (12.5%)
 └─────────────────────────────────────────────┘
 ```
 
-##### 5.3.2 基础奖励计算（Altair版本）
+##### 5.3.2 基础奖励计算
 
 **第一步：计算基础奖励**
 
-Altair升级后，基础奖励计算改为基于增量（increment）的方式，以提高效率并简化计算：
-
 ```python
 """
-以太坊验证者基础奖励计算（Altair版本）
+以太坊验证者基础奖励计算
 这是所有其他奖励（Source、Target、Head）的基础
 """
 
-# === 主网核心参数（Altair） ===
+# === 主网核心参数 ===
 BASE_REWARD_FACTOR = 64              # 基础奖励因子
 EFFECTIVE_BALANCE_INCREMENT = 1e9    # 1 ETH = 1,000,000,000 Gwei
 
 def get_base_reward_per_increment(state):
     """
-    计算每个增量的基础奖励（Altair新增）
+    计算每个增量的基础奖励
     
     参数:
         state: 信标链状态（包含总活跃余额）
@@ -1892,7 +1877,7 @@ def get_base_reward(state, validator_index):
     return increments * get_base_reward_per_increment(state)
 ```
 
-**计算示例（Altair版本）：**
+**计算示例：**
 
 ```text
 假设条件：
@@ -1926,7 +1911,7 @@ base_reward = 32 × 347 ≈ 11,104 Gwei per epoch
 
 ##### 5.3.3 证明奖励详细计算
 
-验证者每个 Epoch 投票一次，需要正确标记三个参与标志：
+验证者每个 Epoch 投票一次：
 
 **投票时机：**
 
@@ -2029,7 +2014,7 @@ def calculate_total_epoch_reward(validator_info, network_state):
     return total_reward
 ```
 
-**具体示例计算（Altair版本）：**
+**具体示例计算**
 
 ```text
 假设条件：
@@ -2101,13 +2086,13 @@ penalty = 0  ⚠️ Head 不惩罚！
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-##### 5.3.4 区块提议者额外奖励（Altair版本）
+##### 5.3.4 区块提议者额外奖励
 
 当验证者被选中提议区块时（随机选择，平均每 ~N epochs 一次，N = 验证者总数 / 32），会获得额外奖励：
 
 ```python
 """
-区块提议者额外奖励（Altair版本）
+区块提议者额外奖励
 提议者通过包含其他验证者的证明获得额外收益
 """
 
@@ -2117,7 +2102,7 @@ WEIGHT_DENOMINATOR = 64
 
 def calculate_proposer_reward(state, block_body):
     """
-    计算区块提议者的额外奖励（Altair实际算法）
+    计算区块提议者的额外奖励
 
     参数:
         state: 信标链状态
@@ -2126,7 +2111,7 @@ def calculate_proposer_reward(state, block_body):
     返回:
         proposer_reward: 提议者获得的总奖励
 
-    核心机制（Altair版本）:
+    核心机制:
         提议者从每个新参与标志获得额外奖励
         公式: proposer_reward = sum(base_reward * weight) / proposer_reward_denominator
         其中 proposer_reward_denominator = (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT) * WEIGHT_DENOMINATOR // PROPOSER_WEIGHT
@@ -2184,7 +2169,7 @@ def calculate_proposer_reward(state, block_body):
 **提议者奖励示例：**
 
 ```text
-提议者奖励机制（Altair版本）：
+提议者奖励机制
 - 从包含在区块中的每个新参与标志获得奖励
 - 奖励比例基于复杂公式，大约相当于证明者奖励的 1/7
 
@@ -2278,14 +2263,14 @@ def calculate_sync_committee_reward(network_state):
 
 ```python
 """
-不活跃分数与惩罚机制（Altair版本）
+不活跃分数与惩罚机制
 当验证者离线时，会累积不活跃分数并受到惩罚
 """
 
-# === 不活跃惩罚参数（Altair） ===
+# === 不活跃惩罚参数 ===
 INACTIVITY_SCORE_BIAS = 4                           # 未参与时分数增加量
 INACTIVITY_SCORE_RECOVERY_RATE = 16                # 正常期恢复速率
-INACTIVITY_PENALTY_QUOTIENT_ALTAIR = 3 * 2**24    # 50,331,648（Altair惩罚商）
+INACTIVITY_PENALTY_QUOTIENT_ALTAIR = 3 * 2**24    # 50,331,648（惩罚商）
 # 注：Phase 0使用 2**26 = 67,108,864，Altair降低了惩罚使其更严格
 
 def update_inactivity_score(validator, network_state):
@@ -2340,7 +2325,7 @@ def calculate_inactivity_penalty(validator, network_state):
     返回:
         penalty: 不活跃惩罚金额（Gwei）
 
-    惩罚机制（Altair版本）:
+    惩罚机制:
         - 只有未参与 Target 的验证者才受惩罚
         - 惩罚与不活跃分数成正比
         - Altair使用更严格的惩罚商（50M vs 67M）
@@ -2350,7 +2335,7 @@ def calculate_inactivity_penalty(validator, network_state):
     if validator.participated_in_target:
         return 0
 
-    # 计算惩罚（Altair公式）
+    # 计算惩罚
     penalty_numerator = validator.effective_balance * validator.inactivity_score
     penalty_denominator = INACTIVITY_SCORE_BIAS * INACTIVITY_PENALTY_QUOTIENT_ALTAIR
 
@@ -2406,7 +2391,7 @@ def calculate_inactivity_penalty(validator, network_state):
 验证者质押: 32 ETH
 网络状态: 34M ETH 总质押，90% 参与率
 
-每 Epoch 收益（Altair版本）:
+每 Epoch 收益:
   Source 奖励:  0.000002189 ETH
   Target 奖励:  0.000004062 ETH
   Head 奖励:    0.000002189 ETH
@@ -2443,7 +2428,7 @@ def calculate_inactivity_penalty(validator, network_state):
 验证者质押: 32 ETH
 参与情况: 95% 时间正确参与
 
-每 Epoch 平均收益（Altair版本）:
+每 Epoch 平均收益:
   95% epochs: 0.000008440 ETH（正常奖励）
   5% epochs:  -0.000006940 ETH（损失奖励 + 小额惩罚）
   ─────────────────────────
