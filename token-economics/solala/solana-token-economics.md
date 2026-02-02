@@ -1,6 +1,6 @@
 # 代币供应机制设计
 
-- **[一、设计框架与核心决策](#一设计框架与核心决策)** - 设计前必须回答的10个核心问题
+- **[一、设计框架与核心决策](#一设计框架与核心决策)** - 设计考虑的核心问题
 - **[二、Solana](#二案例研究solana)** - 可预测递减通胀、高质押率激励
 - **[三、Ethereum](#三以太坊ethereum)** - 最小可行发行（MVI）与通缩模型
 - **[四、Solana对比Ethereum](#四案例研究对比以太坊-vs-solana)** - 两大公链设计哲学系统对比
@@ -1256,36 +1256,9 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 
 ---
 
-### 📌 版本说明
-
-以太坊的奖励机制经历了多次重要升级，本文档基于 **Altair 升级后的规范**（2021年10月）。主要版本差异：
-
-| 版本 | 时间 | 主要变化 |
-|------|------|---------|
-| **Phase 0** | 2020.12-2021.10 | 初始PoS共识层，使用`BASE_REWARDS_PER_EPOCH=4` |
-| **Altair** | 2021.10+ | 移除`BASE_REWARDS_PER_EPOCH`，改用增量计算，引入同步委员会 |
-| **The Merge** | 2022.09+ | 从PoW切换到PoS，发行量减少90% |
-| **Shanghai** | 2023.04+ | 启用质押提款功能 |
-| **Deneb** | 2024.03+ | 引入Blob交易（EIP-4844）|
-
-**本文档采用的公式版本：Altair**
-
-主要原因：
-
-- ✅ Altair是当前主网使用的奖励计算方式
-- ✅ 更高效的基于增量的计算
-- ✅ The Merge之后的所有版本都基于Altair的奖励模型
-
-**参考规范：**
-
-- [Altair Beacon Chain 规范](https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/beacon-chain.md)
-- [Phase 0 规范](https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md)（历史参考）
-
----
-
 ### 以太坊设计决策
 
-根据第一章的10个核心问题，以下是以太坊的设计选择和实际实施情况：
+以太坊的设计选择和实际实施情况：
 
 | # | 核心问题 | 以太坊的选择 | 实际参数/机制 | 设计优势 | 挑战/权衡 |
 |---|---------|-------------|--------------|---------|----------|
@@ -1450,9 +1423,13 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 
 ### 三、发行与通缩机制
 
-#### 3.1 PoS 发行模型
+#### 3.1 发行模型
 
 以太坊 The Merge 后采用 **质押奖励模型**，发行量取决于质押参与率。
+
+**参考规范：**
+
+- [Altair Beacon Chain 规范](https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/beacon-chain.md)
 
 **发行曲线设计原则：**
 
