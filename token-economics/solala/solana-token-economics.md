@@ -1719,6 +1719,16 @@ Epoch N (32 个 slots)
     └─ Head 区块（最新的区块头）
 ```
 
+**投票及时性(Timeliness)**
+
+在以太坊的共识机制中，验证者的投票（Attestation）想要获得完整奖励，必须满足三个维度的**及时性（Timeliness）**要求。
+
+| 投票类型 (Flag) | 作用 | 及时性要求 (Inclusion Delay) | 时间窗口 (约) | 难度 |  
+| :--- | :--- | :--- | :--- | :--- |  
+| **Source** | 确定性 (Finality) | $d \le 5$ | < 60 秒 | 中 |  
+| **Target** | 确定性 (Finality) | $d \le 32$ | < 6.4 分钟 | 低 |  
+| **Head** | 活性 (Liveness) | **$d = 1$** | **< 24 秒** (含 Slot 自身时间) | **高** |  
+
 **计算流程:**
 
 ```text
