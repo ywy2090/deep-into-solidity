@@ -1369,8 +1369,8 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 
 ```text
 总供应量: ~119M ETH
-质押量:   ~36M ETH (28%)
-已燃烧:   ~533M ETH (自 EIP-1559)
+质押量:   ~36M ETH (30%)
+已燃烧:   ~5.3M ETH (自 EIP-1559)
 净通胀率: -0.1% 至 +0.3% (动态变化)
 ```
 
@@ -1439,63 +1439,21 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 - ✅ 质押率高时，降低 APY 控制发行
 - ✅ 确保网络安全的最小发行量
 
-**年化发行率公式：**
+**基础奖励公式：**
 
 ```python
-"""
-以太坊 PoS 发行模型 - 动态调整
-"""
-
 # === 核心常量 ===
 BASE_REWARD_FACTOR = 64              # 基础奖励因子
 BASE_REWARDS_PER_EPOCH = 4           # 每epoch基础奖励数
 
 # === 每个验证者的基础奖励计算 ===
-def calculate_base_reward(validator_effective_balance, total_active_balance):
-    """
-    计算单个验证者每 epoch 的基础奖励
+validator_effective_balance: 验证者有效余额
+total_active_balance: 所有活跃验证者的总余额
 
-    参数:
-        validator_effective_balance: 验证者有效余额
-        total_active_balance: 所有活跃验证者的总余额
-
-    返回:
-        base_reward: 每个epoch的基础奖励（Gwei）
-    """
-    sqrt_total_active_balance = sqrt(total_active_balance)
-
-    base_reward = (validator_effective_balance * BASE_REWARD_FACTOR) / \
-                  (sqrt_total_active_balance * BASE_REWARDS_PER_EPOCH)
-
-    return base_reward
-
-# === 网络年化发行率计算（简化） ===
-def calculate_annual_issuance_rate(total_staked_eth):
-    """
-    计算整个网络的年化发行率
-
-    质押量越高 → 发行率越高 → 但单个验证者APY越低
-    """
-    annual_issuance_rate = BASE_REWARD_FACTOR / sqrt(total_staked_eth)
-    return annual_issuance_rate
+# 基础奖励
+base_reward = (validator_effective_balance * BASE_REWARD_FACTOR) / \
+                  (sqrt(total_active_balance) * BASE_REWARDS_PER_EPOCH)
 ```
-
-**实际发行率示例：**
-
-| 质押量 | 质押率 | 验证者 APY | 年发行量 | 年发行率 |
-|--------|--------|-----------|---------|---------|
-| 10M ETH | 8.3% | ~7.3% | ~730K ETH | ~0.61% |
-| 20M ETH | 16.6% | ~5.2% | ~1.04M ETH | ~0.86% |
-| 30M ETH | 25% | ~4.2% | ~1.26M ETH | ~1.05% |
-| 40M ETH | 33% | ~3.7% | ~1.48M ETH | ~1.23% |
-
-**当前状态（2025）：**
-
-- 质押量: ~34M ETH
-- 质押率: ~28%
-- 验证者 APY: ~3.5-4.2%
-- 年发行量: ~720K ETH
-- 年发行率: ~0.6%
 
 #### 3.2 净供应变化分析
 
@@ -1543,9 +1501,9 @@ def calculate_annual_issuance_rate(total_staked_eth):
 └─────────────────────────────────────────────┘
 ```
 
-**燃烧量统计（截至 2025）：**
+**燃烧量统计：**
 
-- 累计燃烧: ~4,700,000+ ETH
+- 累计燃烧: ~5.3M ETH
 - 日均燃烧: ~2,000-5,000 ETH（取决于网络活动）
 - 价值: 超过 $10B+（按历史价格）
 
@@ -1565,7 +1523,7 @@ EIP-1559 基础费用动态调整算法
 """
 
 # === 核心参数 ===
-TARGET_GAS_USAGE = 15_000_000        # 目标：50% 满（15M / 30M）
+TARGET_GAS_USAGE = 30_000_000        # 目标：50% 满（30M / 60M）
 MAX_FEE_CHANGE = 0.125               # 每块最大变化：±12.5%
 
 def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
@@ -1683,21 +1641,6 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 │  (取决于质押率和网络活动)                   │
 │                                              │
 └─────────────────────────────────────────────┘
-```
-
-**奖励计算示例：**
-
-假设当前质押 32 ETH，质押率 28%：
-
-```text
-年化收益 ≈ 4.0%
-
-共识层奖励: ~0.9-1.0 ETH/年 (~2.8-3.1%)
-执行层奖励: ~0.3-0.4 ETH/年 (~0.9-1.2%)
-总收益: ~1.2-1.4 ETH/年
-
-月收益: ~0.1 ETH
-日收益: ~0.0033 ETH
 ```
 
 #### 5.3 验证者奖励算法详解
@@ -2517,14 +2460,14 @@ Target 投票对网络最终性至关重要
 
 #### 6.1 质押率与网络安全
 
-**当前质押状态（2025）：**
+**当前质押状态：**
 
 | 指标 | 数值 | 说明 |
 |------|------|------|
-| **总供应** | ~120,500,000 ETH | 包含所有 ETH |
-| **质押量** | ~34,000,000 ETH | 参与 PoS 共识的 ETH |
-| **质押率** | ~28% | 总供应中的质押比例 |
-| **活跃验证者** | ~1,060,000+ | 每个验证者质押 32 ETH |
+| **总供应** | ~120.5M ETH | 包含所有 ETH |
+| **质押量** | ~34M ETH | 参与 PoS 共识的 ETH |
+| **质押率** | ~30% | 总供应中的质押比例 |
+| **活跃验证者** | ~1M+ | 每个验证者质押 32 ETH |
 
 **理想质押率：**
 
@@ -2797,7 +2740,7 @@ Solana:
 |------|--------|--------|
 | **总供应量** | ~120.5M ETH | ~619M SOL |
 | **质押量** | ~34M ETH | ~425M SOL |
-| **质押率** | ~28% | ~68% |
+| **质押率** | ~30% | ~68% |
 | **活跃验证者** | ~1,060,000 | ~1,900+ |
 | **质押 APY** | 3.5-4.5% | 6-8% |
 | **年化发行率** | 0.5-0.8% | ~4.0% |
