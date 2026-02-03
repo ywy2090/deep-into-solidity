@@ -1441,19 +1441,53 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 
 **基础奖励公式：**
 
-```python
-# === 核心常量 ===
-BASE_REWARD_FACTOR = 64              # 基础奖励因子
-BASE_REWARDS_PER_EPOCH = 4           # 每epoch基础奖励数
+$
+\text{base\_reward\_per\_increment} =
+\frac{\text{EFFECTIVE\_BALANCE\_INCREMENT} \cdot \text{BASE\_REWARD\_FACTOR}}
+{\sqrt{\text{total\_active\_balance}} \cdot \text{BASE\_REWARDS\_PER\_EPOCH}}
+$
 
-# === 每个验证者的基础奖励计算 ===
-validator_effective_balance: 验证者有效余额
-total_active_balance: 所有活跃验证者的总余额
+$
+\text{base\_reward} =
+\text{base\_reward\_per\_increment} \cdot
+\frac{\text{effective\_balance}}{\text{EFFECTIVE\_BALANCE\_INCREMENT}}
+$
 
-# 基础奖励
-base_reward = (validator_effective_balance * BASE_REWARD_FACTOR) / \
-                  (sqrt(total_active_balance) * BASE_REWARDS_PER_EPOCH)
-```
+> 计算在**共识层最小单位 Gwei**（\(1\ \text{ETH}=10^9\ \text{Gwei}\)）。
+
+**常量**
+
+- `EFFECTIVE_BALANCE_INCREMENT`
+  - 含义：有效余额的计奖粒度（“每多少余额算 1 份”）。
+  - 典型值：**1 ETH（以 Gwei 表示）**。
+  - 作用：把 `effective_balance` 切成若干个“increment”，每个 increment 对应同样的 base reward 份额。
+
+- `BASE_REWARD_FACTOR`
+  - 含义：基础奖励的比例因子。
+  - 值：**64**。
+  - 作用：线性放大/缩小整个基础奖励水平（乘在分子上）。
+
+- `BASE_REWARDS_PER_EPOCH`
+  - 含义：把基础奖励拆分到每个 epoch 的尺度时使用的归一化常量。
+  - 值：**4**。
+  - 作用：与 `BASE_REWARD_FACTOR`、\(\sqrt{TAB}\) 一起确定“每 epoch 的 base reward”基准。
+
+**变量（随网络状态变化）**
+
+- `effective_balance`（验证者有效余额，EB）
+  - 含义：该验证者在共识层用于计算奖励/惩罚的“计奖余额”，不是随时等于真实余额。
+  - 特点：按固定步长向下取整，并有上限（通常上限为 32 ETH 对应的 Gwei）。
+  - 单位：Gwei。
+
+- `total_active_balance`（全网活跃总余额，TAB）
+  - 含义：当前 epoch 里所有 **active** 验证者的 `effective_balance` 之和。
+  - 作用：进入分母的 \(\sqrt{TAB}\)，决定全网“奖励尺度”；TAB 越大，单个验证者的 base reward 越小。
+  - 单位：Gwei。
+
+- `sqrt(total_active_balance)`（活跃总余额的平方根）
+  - 含义：对 TAB 做平方根（实现上通常用整数平方根 `isqrt`）。
+  - 作用：让系统具备“总发行约随 \(\sqrt{TAB}\) 增长、单人收益率约随 \(1/\sqrt{TAB}\) 下降”的性质。
+  - 单位：\(\sqrt{\text{Gwei}}\)（实现上就是整数运算结果）。
 
 #### 3.2 净供应变化分析
 
