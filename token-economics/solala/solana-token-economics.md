@@ -1485,13 +1485,13 @@ base_reward = (validator_effective_balance / EFFECTIVE_BALANCE_INCREMENT) × bas
   - 单位：Gwei。
 
 - `sqrt(total_active_balance)`（活跃总余额的平方根）
-  - 含义：对 TAB 做平方根（实现上通常用整数平方根 `isqrt`）。
-  - 作用：让系统具备“总发行约随 \(\sqrt{TAB}\) 增长、单人收益率约随 \(1/\sqrt{TAB}\) 下降”的性质。
-  - 单位：\(\sqrt{\text{Gwei}}\)（实现上就是整数运算结果）。
+  - 含义：对 TAB 做平方根（实现上通常用整数平方根 `isqrt`）
+  - 作用：让系统具备总发行约随 \(\sqrt{TAB}\) 增长、单人收益率约随 \(1/\sqrt{TAB}\) 下降”的性质。
 
 **关键点:**
-    - 反平方关系,这是算法的核心,全网质押总额（total_active_balance）越高，单个验证者的收益率越低，但全网总发行量会增加（只是增加速度变慢）。这种设计是为了在安全性和通胀之间取得平衡。
-    - 有效余额 (effective balance)：单个验证者的计算上限是 2048 ETH。
+
+- 反平方关系,这是算法的核心,全网质押总额（total_active_balance）越高，单个验证者的收益率越低，但全网总发行量会增加（只是增加速度变慢）。这种设计是为了在安全性和通胀之间取得平衡。
+- 有效余额 (effective balance)：单个验证者的计算上限是 2048 ETH。
 
 #### 3.2 净供应变化分析
 
@@ -1683,6 +1683,44 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 
 #### 5.3 验证者奖励算法
 
+##### 5.3.1 基础奖励计算
+
+如上
+
+##### 5.3.2 奖励分配权重
+
+**权重分配图示：**
+
+```text
+┌─────────────────────────────────────────────┐
+│      总权重 64 的分配（100%）                │
+├─────────────────────────────────────────────┤
+│  Target 投票   [████████████░░░░] 26/64 (40.625%) │
+│  Source 投票   [██████░░░░░░░░░░] 14/64 (21.875%) │
+│  Head 投票     [██████░░░░░░░░░░] 14/64 (21.875%) │
+│  提议者额外    [████░░░░░░░░░░░░]  8/64 (12.500%) │
+│  同步委员会    [█░░░░░░░░░░░░░░░]  2/64 (3.125%)  │
+└─────────────────────────────────────────────┘
+```
+
+##### 5.3.3 证明奖励详细计算
+
+验证者每个 Epoch 投票一次：
+
+**投票时机：**
+
+```text
+Epoch N (32 个 slots)
+├─ 验证者被分配到某个特定 slot（如 Slot 15）
+├─ 在该 slot 发布证明（attestation）
+└─ 证明内容：
+    ├─ Source 检查点（上个已确定的 epoch）
+    ├─ Target 检查点（当前 epoch）
+    └─ Head 区块（最新的区块头）
+```
+
+**计算流程:**
+
 ```text
 ┌──────────────────────────────────────────────────────────┐
 │                     奖励计算公式                          │
@@ -1710,332 +1748,13 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
                    └──────────┘ └──────────┘ └──────────┘
 ```
 
-##### 5.3.1 基础奖励计算
-
-如上
-
-##### 5.3.2 奖励分配权重
-
-**时间参数：**
-
-```text
-1 Slot    = 12 秒
-1 Epoch   = 32 Slots = 384 秒 ≈ 6.4 分钟
-1 年      ≈ 82,125 Epochs
-```
-
-**基础常量：**
-
-```yaml
-BASE_REWARD_FACTOR: 64                    # 基础奖励因子
-EFFECTIVE_BALANCE_INCREMENT: 1 ETH        # 有效余额增量单位（1,000,000,000 Gwei）
-WEIGHT_DENOMINATOR: 64                    # 权重分母
-
-# 参与标志权重分配
-TIMELY_SOURCE_WEIGHT: 14                  # Source 投票权重 (21.875%)
-TIMELY_TARGET_WEIGHT: 26                  # Target 投票权重 (40.625%)
-TIMELY_HEAD_WEIGHT: 14                    # Head 投票权重 (21.875%)
-SYNC_REWARD_WEIGHT: 2                     # 同步委员会权重 (3.125%)
-PROPOSER_WEIGHT: 8                        # 提议者额外权重 (12.5%)
-```
-
-**权重分配图示：**
-
-```text
-┌─────────────────────────────────────────────┐
-│      总权重 64 的分配（100%）                │
-├─────────────────────────────────────────────┤
-│  Target 投票   [████████████░░░░] 26/64 (40.625%) │
-│  Source 投票   [██████░░░░░░░░░░] 14/64 (21.875%) │
-│  Head 投票     [██████░░░░░░░░░░] 14/64 (21.875%) │
-│  提议者额外    [████░░░░░░░░░░░░]  8/64 (12.500%) │
-│  同步委员会    [█░░░░░░░░░░░░░░░]  2/64 (3.125%)  │
-└─────────────────────────────────────────────┘
-```
-
-设计理念：
-
-1. Target 最重要：占 40.625%，因为决定最终性
-2. Source 和 Head 相等：各占 21.875%
-3. 总和：14 + 26 + 14 = 54/64 = 84.375%（剩余给提议者和同步委员会）
-
-##### 5.3.3 证明奖励详细计算
-
-验证者每个 Epoch 投票一次：
-
-**投票时机：**
-
-```text
-Epoch N (32 个 slots)
-├─ 验证者被分配到某个特定 slot（如 Slot 15）
-├─ 在该 slot 发布证明（attestation）
-└─ 证明内容：
-    ├─ Source 检查点（上个已确定的 epoch）
-    ├─ Target 检查点（当前 epoch）
-    └─ Head 区块（最新的区块头）
-```
-
-**第二步：计算参与标志奖励**
-
-对于每个参与标志（Source、Target、Head），验证者如果正确参与且未被罚没，则获得奖励：
-
-# === 权重分配（总权重 64） ===
-
-FLAG_WEIGHTS = {
-    TIMELY_SOURCE_FLAG: 14,    # 21.875%
-    TIMELY_TARGET_FLAG: 26,    # 40.625%（最重要）
-    TIMELY_HEAD_FLAG: 14       # 21.875%
-}
-
-- participating_balance: 正确参与该标志的总余额
-- total_active_balance: 总活跃余额
-
-```python
-"""
-以太坊验证者参与标志奖励计算
-验证者每个 epoch 需要对三个检查点投票
-"""
-
-# === 参与标志常量 ===
-TIMELY_SOURCE_FLAG = 0    # Source 检查点
-TIMELY_TARGET_FLAG = 1    # Target 检查点
-TIMELY_HEAD_FLAG = 2      # Head 区块
-
-# === 权重分配（总权重 64） ===
-FLAG_WEIGHTS = {
-    TIMELY_SOURCE_FLAG: 14,    # 21.875%
-    TIMELY_TARGET_FLAG: 26,    # 40.625%（最重要）
-    TIMELY_HEAD_FLAG: 14       # 21.875%
-}
-
-WEIGHT_DENOMINATOR = 64
-
-**具体示例计算**
-
-```text
-假设条件：
-- 基础奖励: 11,104 Gwei（从上面计算得出）
-- 网络参与率: 90% 的验证者正确参与
-- 总活跃增量: 34,000,000 increments
-- 参与增量: 30,600,000 increments (90%)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. Target 投票奖励（权重 26）：
-
-reward = (11,104 × 26 × 30,600,000) / (34,000,000 × 64)
-       = 8,838,489,600,000 / 2,176,000,000
-       ≈ 4,062 Gwei
-       ≈ 0.000004062 ETH
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-2. Source 投票奖励（权重 14）：
-
-reward = (11,104 × 14 × 30,600,000) / (34,000,000 × 64)
-       ≈ 2,189 Gwei
-       ≈ 0.000002189 ETH
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-3. Head 投票奖励（权重 14）：
-
-reward ≈ 2,189 Gwei
-       ≈ 0.000002189 ETH
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-总计（完美表现，90% 网络参与率）：
-
-每 Epoch 奖励 = 4,062 + 2,189 + 2,189
-               = 8,440 Gwei
-               ≈ 0.000008440 ETH
-
-年化收益（仅共识层证明奖励）：
-= 0.000008440 × 82,125 epochs
-≈ 0.693 ETH/年
-≈ 2.17% APY（基于 32 ETH）
-
-实际总收益还需加上：
-+ 区块提议奖励（平均 +1.5% APY）
-+ 执行层收入（优先费+MEV，平均 +0.8% APY）
-+ 同步委员会奖励（偶尔，平均 +0.02% APY）
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-实际总 APY ≈ 3.5-4.5%（即 1.1-1.4 ETH/年）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
 ##### 5.3.4 区块提议者额外奖励
 
-当验证者被选中提议区块时（随机选择，平均每 ~N epochs 一次，N = 验证者总数 / 32），会获得额外奖励：
-
-```python
-"""
-区块提议者额外奖励
-提议者通过包含其他验证者的证明获得额外收益
-"""
-
-# === 提议者权重 ===
-PROPOSER_WEIGHT = 8              # 提议者权重
-WEIGHT_DENOMINATOR = 64
-
-def calculate_proposer_reward(state, block_body):
-    """
-    计算区块提议者的额外奖励
-
-    参数:
-        state: 信标链状态
-        block_body: 区块体（包含证明）
-
-    返回:
-        proposer_reward: 提议者获得的总奖励
-
-    核心机制:
-        提议者从每个新参与标志获得额外奖励
-        公式: proposer_reward = sum(base_reward * weight) / proposer_reward_denominator
-        其中 proposer_reward_denominator = (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT) * WEIGHT_DENOMINATOR // PROPOSER_WEIGHT
-             = (64 - 8) * 64 / 8 = 56 * 8 = 448
-    """
-    proposer_reward_numerator = 0
-    
-    # 遍历区块中包含的所有证明
-    for attestation in block_body.attestations:
-        # 获取证明的参与标志索引
-        participation_flag_indices = get_attestation_participation_flag_indices(
-            state, attestation.data, state.slot - attestation.data.slot
-        )
-        
-        # 遍历证明中的所有验证者
-        for attester_index in get_attesting_indices(state, attestation):
-            # 对于每个新设置的参与标志
-            for flag_index in participation_flag_indices:
-                epoch_participation = get_epoch_participation(state, attestation.data.target.epoch)
-                
-                # 如果这是新标志（之前未设置）
-                if not has_flag(epoch_participation[attester_index], flag_index):
-                    base_reward = get_base_reward(state, attester_index)
-                    weight = PARTICIPATION_FLAG_WEIGHTS[flag_index]
-                    
-                    # 累加到提议者奖励分子
-                    proposer_reward_numerator += base_reward * weight
-    
-    # 计算最终提议者奖励
-    proposer_reward_denominator = (
-        (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT) * WEIGHT_DENOMINATOR // PROPOSER_WEIGHT
-    )
-    # proposer_reward_denominator = (64 - 8) * 64 / 8 = 448
-    
-    proposer_reward = proposer_reward_numerator // proposer_reward_denominator
-    
-    return proposer_reward
-
-# === 实际计算示例 ===
-# 假设一个区块包含：
-# - 128个证明（MAX_ATTESTATIONS）
-# - 每个证明平均包含 256 个验证者
-# - 所有证明都设置了3个新标志（Source, Target, Head）
-# - 基础奖励 = 11,104 Gwei
-#
-# proposer_reward_numerator = 128 × 256 × (11,104 × (14+26+14))
-#                          = 32,768 × (11,104 × 54)
-#                          ≈ 19,626,516,480 Gwei
-#
-# proposer_reward = 19,626,516,480 / 448
-#                 ≈ 43,808,295 Gwei
-#                 ≈ 0.0438 ETH per block
-```
-
-**提议者奖励示例：**
-
-```text
-提议者奖励机制
-- 从包含在区块中的每个新参与标志获得奖励
-- 奖励比例基于复杂公式，大约相当于证明者奖励的 1/7
-
-实际奖励范围（取决于包含的证明数量和网络参与率）：
-单次提议奖励: 0.02-0.05 ETH
-（满区块、高参与率时可达 0.05+ ETH）
-
-年化影响（假设平均每 1000 epochs 提议一次）：
-- 提议频率: 82,125 epochs/年 ÷ 1000 ≈ 82 次/年
-- 年收益: 0.03 ETH × 82 ≈ 2.46 ETH/年
-- APY: 2.46 / 32 ≈ 7.7% 额外收益
-
-注意：
-1. 提议频率与验证者总数相关（越多验证者，提议频率越低）
-2. 当前约1,060,000验证者，每个验证者约每33,125个epoch提议一次
-3. 实际提议者奖励波动较大，以上为估算值
-```
+当验证者被选中提议区块时（随机选择，平均每 ~N epochs 一次，N = 验证者总数 / 32），会获得额外奖励
 
 ##### 5.3.5 同步委员会奖励
 
-验证者有约 2 年一次的机会被选入同步委员会（512 个验证者，任期 256 epochs）：
-
-```python
-"""
-同步委员会奖励计算
-同步委员会帮助轻客户端快速同步链状态
-"""
-
-# === 同步委员会参数 ===
-SYNC_COMMITTEE_SIZE = 512        # 委员会成员数
-SYNC_REWARD_WEIGHT = 2           # 权重 2/64 = 3.125%
-PROPOSER_WEIGHT = 8              # 提议者权重 8/64 = 12.5%
-WEIGHT_DENOMINATOR = 64
-
-def calculate_sync_committee_reward(network_state):
-    """
-    计算同步委员会参与者的奖励
-
-    参数:
-        network_state: 网络状态
-            - total_active_balance: 总活跃余额
-            - base_reward_per_increment: 每增量基础奖励
-
-    返回:
-        participant_reward: 每个参与者的奖励
-        proposer_reward: 提议者从同步聚合中获得的奖励
-
-    机制说明:
-        - 每个 epoch 选出 512 个验证者组成同步委员会
-        - 任期 256 epochs（约 27 小时）
-        - 每个 slot 委员会成员需要签名当前 head
-    """
-
-    # 计算网络总增量（以 1 ETH 为单位）
-    total_active_increments = network_state.total_active_balance // EFFECTIVE_BALANCE_INCREMENT
-
-    # 计算网络总基础奖励
-    total_base_rewards = network_state.base_reward_per_increment * total_active_increments
-
-    # 计算同步委员会总奖励池
-    max_sync_rewards = (total_base_rewards * SYNC_REWARD_WEIGHT) // WEIGHT_DENOMINATOR
-
-    # 平均分配给 512 个参与者
-    participant_reward = max_sync_rewards // SYNC_COMMITTEE_SIZE
-
-    # 提议者从同步聚合中获得额外奖励
-    proposer_reward = (participant_reward * PROPOSER_WEIGHT) // WEIGHT_DENOMINATOR
-
-    return participant_reward, proposer_reward
-
-# === 同步委员会收益示例 ===
-# 如果被选中（约2年一次）:
-# - 每 epoch 额外奖励: ~0.0002 ETH
-# - 任期 256 epochs 总奖励: ~0.05 ETH
-# - 年化影响（平均分摊）: +0.02% APY
-```
-
-**同步委员会奖励示例：**
-
-```text
-被选入同步委员会时（512 个位置，256 epochs 任期）：
-
-每 epoch 额外奖励 ≈ 0.0002 ETH
-任期总奖励（256 epochs）≈ 0.05 ETH
-年化影响（平均分摊）≈ +0.02% APY
-```
+验证者有约 2 年一次的机会被选入同步委员会（512 个验证者，任期 256 epochs）
 
 ##### 5.3.6 不活跃惩罚
 
@@ -2136,121 +1855,6 @@ def calculate_inactivity_penalty(validator, network_state):
 #   - 分数无法恢复
 #   - 二次惩罚生效
 #   - 目的：迫使离线验证者退出
-```
-
-**不活跃惩罚示例：**
-
-```text
-正常情况（非泄漏期）：
-- 错过 1 个 epoch：损失正常奖励，分数 +4，然后 -16（立即恢复）
-- 几乎无额外惩罚
-
-长期离线（数天）：
-- 分数持续累积
-- 假设离线 100 epochs，未进入泄漏期：
-  - 损失的奖励：100 × 0.000008440 ≈ 0.000844 ETH
-  - 不活跃惩罚（分数约 400，使用Altair公式）：
-    penalty = (32 ETH × 400) / (4 × 50,331,648)
-            = 12,800 ETH / 201,326,592
-            ≈ 0.0000636 ETH
-  - 总损失：≈ 0.000908 ETH（主要是错过的奖励）
-  
-注：这只是证明奖励的损失，不包括错过的提议者和执行层收入
-
-不活跃泄漏期（网络无法最终化 >4 epochs）：
-- 二次惩罚开始生效
-- 目的：迫使离线验证者退出，恢复网络最终性
-- 惩罚可能累积到有效余额的大部分
-```
-
-##### 5.3.7 完整收益计算示例
-
-**场景 1：完美在线验证者（100% 正确率，90% 网络参与率）**
-
-```yaml
-验证者质押: 32 ETH
-网络状态: 34M ETH 总质押，90% 参与率
-
-每 Epoch 收益:
-  Source 奖励:  0.000002189 ETH
-  Target 奖励:  0.000004062 ETH
-  Head 奖励:    0.000002189 ETH
-  ─────────────────────────
-  共识层小计:   0.000008440 ETH/epoch
-
-年化收益 (82,125 epochs):
-  共识层证明:   0.693 ETH/年 = 2.17% APY
-
-区块提议（平均 33,125 epochs 一次，当前验证者数量）:
-  额外收益:     0.074 ETH/年 = 0.23% APY
-  （计算：82,125/33,125 × 0.03 ETH）
-
-执行层收益（优先费 + MEV）:
-  估算:         0.35 ETH/年 = 1.09% APY
-
-同步委员会（偶尔被选中）:
-  平均:         0.01 ETH/年 = 0.03% APY
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-总年化收益:     ~1.12 ETH/年
-总 APY:         ~3.5%
-月收益:         ~0.093 ETH
-日收益:         ~0.0031 ETH
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-注：实际APY取决于网络使用率和MEV市场，
-    牛市高使用期可达4.5%+
-```
-
-**场景 2：偶尔离线验证者（95% 正确率）**
-
-```yaml
-验证者质押: 32 ETH
-参与情况: 95% 时间正确参与
-
-每 Epoch 平均收益:
-  95% epochs: 0.000008440 ETH（正常奖励）
-  5% epochs:  -0.000006940 ETH（损失奖励 + 小额惩罚）
-  ─────────────────────────
-  平均:       0.000007671 ETH/epoch
-
-年化收益:
-  共识层证明: 0.630 ETH/年 = 1.97% APY
-  区块提议:   0.074 ETH/年 = 0.23% APY
-  执行层:     0.33 ETH/年 = 1.03% APY
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-总年化收益:   ~1.03 ETH/年
-总 APY:       ~3.2%
-相比完美:     -8.6% 收益损失
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-**场景 3：表现不佳验证者（80% 正确率）**
-
-```yaml
-验证者质押: 32 ETH
-参与情况: 80% 时间正确参与
-
-每 Epoch 平均收益:
-  80% epochs: 0.000008440 ETH
-  20% epochs: -0.000006940 ETH
-  ─────────────────────────
-  平均:       0.000005364 ETH/epoch
-
-年化收益:
-  共识层证明: 0.440 ETH/年 = 1.38% APY
-  区块提议:   0.059 ETH/年 = 0.18% APY
-  执行层:     0.28 ETH/年 = 0.88% APY
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-总年化收益:   ~0.78 ETH/年
-总 APY:       ~2.4%
-相比完美:     -30.4% 收益损失
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-警告：80%参与率意味着严重的节点问题，
-      应立即检查并修复！
 ```
 
 ##### 5.3.8 关键设计特性
