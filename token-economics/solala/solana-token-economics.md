@@ -1452,9 +1452,7 @@ Solana 的通胀参数目前写死在协议中，但未来可能通过治理调�
 
 **基础奖励公式：**
 
-**分配奖励最重要的公式**
-
-```
+```python
 // 步骤 1：计算每增量基础奖励
 base_reward_per_increment = (EFFECTIVE_BALANCE_INCREMENT × BASE_REWARD_FACTOR) / √(total_active_balance)
 
@@ -1683,7 +1681,7 @@ def calculate_next_base_fee(current_base_fee, gas_used_in_last_block):
 └─────────────────────────────────────────────┘
 ```
 
-#### 5.3 验证者奖励算法详解
+#### 5.3 验证者奖励算法
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
@@ -1781,6 +1779,17 @@ Epoch N (32 个 slots)
 
 对于每个参与标志（Source、Target、Head），验证者如果正确参与且未被罚没，则获得奖励：
 
+# === 权重分配（总权重 64） ===
+
+FLAG_WEIGHTS = {
+    TIMELY_SOURCE_FLAG: 14,    # 21.875%
+    TIMELY_TARGET_FLAG: 26,    # 40.625%（最重要）
+    TIMELY_HEAD_FLAG: 14       # 21.875%
+}
+
+- participating_balance: 正确参与该标志的总余额
+- total_active_balance: 总活跃余额
+
 ```python
 """
 以太坊验证者参与标志奖励计算
@@ -1801,71 +1810,6 @@ FLAG_WEIGHTS = {
 
 WEIGHT_DENOMINATOR = 64
 
-def calculate_participation_reward(validator_info, flag_index, network_state):
-    """
-    计算验证者某个参与标志的奖励或惩罚
-
-    参数:
-        validator_info: 验证者信息
-            - base_reward: 基础奖励
-            - participated: 是否参与了该标志
-            - is_slashed: 是否被罚没
-        flag_index: 参与标志索引 (0=Source, 1=Target, 2=Head)
-        network_state: 网络状态
-            - participating_balance: 正确参与该标志的总余额
-            - total_active_balance: 总活跃余额
-            - is_inactivity_leak: 是否处于不活跃泄漏期
-
-    返回:
-        reward_or_penalty: 奖励（正数）或惩罚（负数），单位 Gwei
-    """
-
-    base_reward = validator_info.base_reward
-    weight = FLAG_WEIGHTS[flag_index]
-
-    # 计算参与率（以 1 ETH 增量为单位）
-    participating_increments = network_state.participating_balance // EFFECTIVE_BALANCE_INCREMENT
-    active_increments = network_state.total_active_balance // EFFECTIVE_BALANCE_INCREMENT
-
-    # === 情况 1: 验证者正确参与且未被罚没 ===
-    if validator_info.participated[flag_index] and not validator_info.is_slashed:
-
-        if not network_state.is_inactivity_leak:
-            # 正常情况：获得奖励（基于网络参与率）
-            reward_numerator = base_reward * weight * participating_increments
-            reward = reward_numerator // (active_increments * WEIGHT_DENOMINATOR)
-            return reward
-            # 参与率越高 → 奖励越高（激励大家都参与）
-
-        else:
-            # 不活跃泄漏期：不获得奖励（但也不惩罚）
-            return 0
-
-    # === 情况 2: 验证者未参与 ===
-    else:
-        # Head 标志特殊：不参与不惩罚
-        if flag_index == TIMELY_HEAD_FLAG:
-            return 0
-
-        # Source 和 Target：不参与会被惩罚
-        penalty = (base_reward * weight) // WEIGHT_DENOMINATOR
-        return -penalty
-
-# === 完整 epoch 奖励示例 ===
-def calculate_total_epoch_reward(validator_info, network_state):
-    """
-    计算验证者一个 epoch 的总奖励
-    """
-    total_reward = 0
-
-    # 累加三个参与标志的奖励
-    for flag_index in [TIMELY_SOURCE_FLAG, TIMELY_TARGET_FLAG, TIMELY_HEAD_FLAG]:
-        reward = calculate_participation_reward(validator_info, flag_index, network_state)
-        total_reward += reward
-
-    return total_reward
-```
-
 **具体示例计算**
 
 ```text
@@ -1879,41 +1823,25 @@ def calculate_total_epoch_reward(validator_info, network_state):
 
 1. Target 投票奖励（权重 26）：
 
-如果正确参与：
 reward = (11,104 × 26 × 30,600,000) / (34,000,000 × 64)
        = 8,838,489,600,000 / 2,176,000,000
        ≈ 4,062 Gwei
        ≈ 0.000004062 ETH
 
-如果未参与：
-penalty = (11,104 × 26) / 64
-        ≈ 4,512 Gwei
-        ≈ 0.000004512 ETH
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 2. Source 投票奖励（权重 14）：
 
-如果正确参与：
 reward = (11,104 × 14 × 30,600,000) / (34,000,000 × 64)
        ≈ 2,189 Gwei
        ≈ 0.000002189 ETH
-
-如果未参与：
-penalty = (11,104 × 14) / 64
-        ≈ 2,429 Gwei
-        ≈ 0.000002429 ETH
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 3. Head 投票奖励（权重 14）：
 
-如果正确参与：
 reward ≈ 2,189 Gwei
        ≈ 0.000002189 ETH
-
-如果未参与：
-penalty = 0  ⚠️ Head 不惩罚！
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
