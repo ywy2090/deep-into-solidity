@@ -1,0 +1,178 @@
+
+flowchart TB
+
+  %% =========================
+  %% 0) 核心资产
+  %% =========================
+  AAVE["🪙 AAVE 代币"]
+
+  %% =========================
+  %% 1) 获取路径（入口）
+  %% =========================
+  subgraph ACQ["💡 用户获取 AAVE 入口"]
+    MKT["二级市场购买 CEX/DEX"]
+    REW["质押奖励获取"]
+    GRANT["DAO 生态拨款 贡献者支付"]
+    SRV["DAO 服务商支付 来自金库储备"]
+  end
+
+  MKT --> AAVE
+  REW --> AAVE
+  GRANT --> AAVE
+  SRV --> AAVE
+
+  %% =========================
+  %% 2) 治理
+  %% =========================
+  subgraph GOVSG["🗳️ 治理 DAO"]
+    GOV["治理投票 提案/参数/升级"]
+    DELEG["委托投票 Delegation"]
+  end
+
+  AAVE -->|"投票"| GOV
+  AAVE -->|"委托"| DELEG
+  DELEG -->|"影响"| GOV
+
+  %% =========================
+  %% 3) 质押与安全模块
+  %% =========================
+  subgraph SMSG["🛡️ Safety Module 质押与风险"]
+    SM["Safety Module 风险缓冲池"]
+    STKA["stkAAVE 质押凭证 1:1 铸造"]
+    CD1["冷却期 Cooldown 开始倒计时"]
+    WW1["赎回窗口 Withdrawal Window"]
+    UNSTA["解除质押 stkAAVE 转回 AAVE"]
+    SLASH["Shortfall Event 缺口事件 最高削减 30%"]
+    REISSUE["Recovery Issuance 临时增发补偿工具 覆盖协议赤字"]
+    STKB["stkBPT 质押凭证"]
+    CD2["冷却期 Cooldown 开始倒计时"]
+    WW2["赎回窗口 Withdrawal Window"]
+    UNSTB["解除质押 stkBPT 转回 ABPT"]
+  end
+
+  AAVE -->|"质押"| SM
+  SM -->|"铸造 1:1"| STKA
+  STKA -->|"开始"| CD1
+  CD1 -->|"进入"| WW1
+  WW1 -->|"赎回"| UNSTA
+  UNSTA -->|"回到"| AAVE
+
+  SM -->|"触发风险覆盖"| SLASH
+  SLASH -->|"削减"| STKA
+  SLASH -->|"削减"| STKB
+  SLASH -->|"不足时触发"| REISSUE
+
+  STKB -->|"开始"| CD2
+  CD2 -->|"进入"| WW2
+  WW2 -->|"赎回"| UNSTB
+
+  STKA -->|"享有投票权"| GOV
+  STKB -->|"享有投票权"| GOV
+
+  %% =========================
+  %% 4) Balancer 路径
+  %% =========================
+  subgraph BPTSG["🌊 Balancer 路径 ABPT"]
+    LP["提供流动性 AAVE #43; ETH"]
+    ABPT["ABPT 池子份额凭证"]
+    EXITLP["退出流动性 Redeem LP ABPT 转回 AAVE #43; ETH"]
+  end
+
+  AAVE -->|"配对做市"| LP
+  LP -->|"获得"| ABPT
+  ABPT -->|"质押"| SM
+  SM -->|"铸造"| STKB
+  UNSTB -->|"得到"| ABPT
+  ABPT -->|"退出池子"| EXITLP
+  EXITLP -->|"得到"| AAVE
+
+  %% =========================
+  %% 5) aToken 借贷闭环
+  %% =========================
+  subgraph LENDSG["🏦 Aave 借贷闭环 AAVE 与 aAAVE"]
+    POOL["Aave Pool 借贷市场"]
+    aAAVE["aAAVE 存款凭证 持续生息"]
+    COLL["启用抵押 Enable Collateral"]
+    BORROW["借出其他资产 Borrow"]
+    REPAY["偿还借款 Repay"]
+    UNLOCK["解除抵押 Disable Collateral"]
+    REDEEM["赎回 Withdraw aAAVE 转回 AAVE"]
+  end
+
+  AAVE -->|"存入 Deposit"| POOL
+  POOL -->|"铸造"| aAAVE
+  aAAVE -->|"启用抵押"| COLL
+  COLL -->|"借出"| BORROW
+  BORROW -->|"偿还"| REPAY
+  REPAY -->|"解押"| UNLOCK
+  UNLOCK -->|"继续持有"| aAAVE
+  aAAVE -->|"赎回 Withdraw"| REDEEM
+  REDEEM -->|"回到"| AAVE
+
+  %% =========================
+  %% 6) 费用归集
+  %% =========================
+  subgraph FEESG["💰 费用归集 Collector 至 Treasury 至 分配回购"]
+    FEES["协议费用来源 借贷利差 reserve factor 清算费用 闪电贷手续费"]
+    COLLECT["Fee Collector 费用收集合约"]
+    TREAS["DAO Treasury 国库 Collector 持仓"]
+    RES["Ecosystem Reserve 生态系统储备 激励拨款支付"]
+    AFC["AFC 执行委员会 多签 3/4 门限"]
+    BUY["二级市场回购 AAVE 年预算 50M 周 25K~175K"]
+  end
+
+  FEES -->|"上缴归集"| COLLECT
+  COLLECT -->|"进入"| TREAS
+  TREAS -->|"治理决策分配"| RES
+  TREAS -->|"授权执行"| AFC
+  AFC -->|"执行回购"| BUY
+  BUY -->|"买入"| AAVE
+  RES -->|"质押奖励发放"| REW
+  RES -->|"拨款支付"| GRANT
+
+  %% =========================
+  %% 7) GHO 与 Anti-GHO
+  %% =========================
+  subgraph GHOSG["⚗️ GHO 收入分配 Anti-GHO 机制"]
+    GHO["GHO 原生稳定币"]
+    GHOREV["GHO 协议收入 50% 铸造 Anti-GHO"]
+    ANTI["Anti-GHO 不可转让 ERC-20 线性产生 每两周可领取"]
+    DIST80["80% 分配给 stkAAVE 持有者"]
+    DIST20["20% 分配给 stkBPT 持有者"]
+    USE1["用法① 1:1 抵消 GHO 债务 相当于免息还款"]
+    USE2["用法② 转换为 stkGHO 享有进一步激励"]
+    STKG["stkGHO"]
+  end
+
+  GHO -->|"产生"| GHOREV
+  GHOREV -->|"铸造"| ANTI
+  ANTI -->|"分配"| DIST80
+  ANTI -->|"分配"| DIST20
+  DIST80 -->|"流向"| STKA
+  DIST20 -->|"流向"| STKB
+  ANTI -->|"使用"| USE1
+  ANTI -->|"使用"| USE2
+  USE2 --> STKG
+
+  %% =========================
+  %% 样式
+  %% =========================
+  classDef core fill:#6B46C1,stroke:#553C9A,color:#fff,font-weight:bold
+  classDef acq fill:#322659,stroke:#44337A,color:#fff
+  classDef gov fill:#2C7A7B,stroke:#285E61,color:#fff
+  classDef stake fill:#2B6CB0,stroke:#2C5282,color:#fff
+  classDef bpt fill:#2C5282,stroke:#2A4365,color:#fff
+  classDef lend fill:#4A5568,stroke:#2D3748,color:#fff
+  classDef fee fill:#276749,stroke:#22543D,color:#fff
+  classDef gho fill:#B7791F,stroke:#975A16,color:#fff
+  classDef risk fill:#C53030,stroke:#9B2C2C,color:#fff
+
+  class AAVE core
+  class MKT,REW,GRANT,SRV acq
+  class GOV,DELEG gov
+  class SM,STKA,STKB,CD1,CD2,WW1,WW2,UNSTA,UNSTB stake
+  class LP,ABPT,EXITLP bpt
+  class POOL,aAAVE,COLL,BORROW,REPAY,UNLOCK,REDEEM lend
+  class FEES,COLLECT,TREAS,RES,AFC,BUY fee
+  class GHO,GHOREV,ANTI,DIST80,DIST20,USE1,USE2,STKG gho
+  class SLASH,REISSUE risk
