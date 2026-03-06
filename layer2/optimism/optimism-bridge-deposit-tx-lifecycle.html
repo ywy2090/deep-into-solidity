@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DepositTx 完整生命周期</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #071018;
+    --panel: rgba(10, 22, 34, 0.88);
+    --panel-2: rgba(14, 29, 45, 0.92);
+    --border: rgba(133, 176, 218, 0.18);
+    --muted: #7f95aa;
+    --text: #d8e4ef;
+    --cyan: #3ad7ff;
+    --orange: #ff8a4c;
+    --green: #4ee38d;
+    --yellow: #ffd166;
+    --pink: #ff6fae;
+    --violet: #9b8cff;
+    --shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: "IBM Plex Sans", sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(circle at top left, rgba(58, 215, 255, 0.12), transparent 28%),
+      radial-gradient(circle at top right, rgba(255, 138, 76, 0.12), transparent 26%),
+      linear-gradient(180deg, #040a12 0%, #071018 36%, #08131d 100%);
+  }
+
+  .page {
+    width: min(1280px, calc(100vw - 32px));
+    margin: 0 auto;
+    padding: 28px 0 40px;
+  }
+
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    background:
+      linear-gradient(135deg, rgba(58, 215, 255, 0.08), transparent 40%),
+      linear-gradient(315deg, rgba(255, 138, 76, 0.08), transparent 42%),
+      var(--panel);
+    box-shadow: var(--shadow);
+    padding: 30px 32px 26px;
+    margin-bottom: 20px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(30px, 4vw, 54px);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+  }
+
+  .subtitle {
+    margin-top: 14px;
+    max-width: 920px;
+    font-size: 15px;
+    line-height: 1.8;
+    color: #b7c8d8;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 0.9fr;
+    gap: 18px;
+    margin-top: 24px;
+  }
+
+  .mini-panel {
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--panel-2);
+    padding: 16px 18px;
+  }
+
+  .mini-title {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+  }
+
+  .chip.cyan { color: var(--cyan); }
+  .chip.orange { color: var(--orange); }
+  .chip.green { color: var(--green); }
+  .chip.yellow { color: var(--yellow); }
+  .chip.pink { color: var(--pink); }
+  .chip.violet { color: var(--violet); }
+
+  .summary-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .summary-item {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 10px;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .summary-item .k {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--muted);
+  }
+
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin: 16px 0 22px;
+  }
+
+  .stage {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--panel);
+    padding: 18px 16px 16px;
+    box-shadow: var(--shadow);
+  }
+
+  .stage::after {
+    content: "→";
+    position: absolute;
+    right: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(216, 228, 239, 0.22);
+    font-size: 28px;
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  .stage:last-child::after { display: none; }
+
+  .stage-no {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    margin-bottom: 12px;
+    border: 1px solid currentColor;
+  }
+
+  .stage.cyan .stage-no { color: var(--cyan); }
+  .stage.orange .stage-no { color: var(--orange); }
+  .stage.green .stage-no { color: var(--green); }
+  .stage.yellow .stage-no { color: var(--yellow); }
+
+  .stage h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+  }
+
+  .stage p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.75;
+    color: #bfd0df;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1.25fr 0.95fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    background: var(--panel);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0));
+  }
+
+  .card-title {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .card-sub {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .card-body {
+    padding: 18px;
+  }
+
+  .event-abi {
+    display: grid;
+    gap: 10px;
+  }
+
+  .abi-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .abi-row .k {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--cyan);
+    font-size: 12px;
+  }
+
+  .abi-row .v {
+    font-size: 13px;
+    line-height: 1.65;
+    color: #c7d7e5;
+  }
+
+  .mono {
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  .branch {
+    display: grid;
+    gap: 12px;
+  }
+
+  .branch-box {
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .branch-box.cyan { box-shadow: inset 0 0 0 1px rgba(58, 215, 255, 0.08); }
+  .branch-box.orange { box-shadow: inset 0 0 0 1px rgba(255, 138, 76, 0.08); }
+
+  .branch-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .branch-title strong {
+    font-size: 15px;
+  }
+
+  .branch-title span {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .steps {
+    display: grid;
+    gap: 8px;
+  }
+
+  .step-row {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .step-idx {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: #061018;
+    background: var(--yellow);
+    margin-top: 1px;
+  }
+
+  .step-text {
+    font-size: 13px;
+    line-height: 1.72;
+    color: #c6d7e6;
+  }
+
+  .journey {
+    display: grid;
+    gap: 14px;
+  }
+
+  .lane {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .lane-label {
+    border-radius: 18px;
+    padding: 14px 12px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.028);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .lane-track {
+    display: grid;
+    gap: 10px;
+  }
+
+  .journey-node {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .journey-node::before {
+    content: "";
+    position: absolute;
+    left: -9px;
+    top: 22px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.025);
+  }
+
+  .journey-node.cyan { color: var(--cyan); }
+  .journey-node.orange { color: var(--orange); }
+  .journey-node.green { color: var(--green); }
+  .journey-node.yellow { color: var(--yellow); }
+  .journey-node.pink { color: var(--pink); }
+  .journey-node.violet { color: var(--violet); }
+
+  .journey-node h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    color: var(--text);
+  }
+
+  .journey-node p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.72;
+    color: #c6d7e6;
+  }
+
+  .token-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .token-box {
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: rgba(255,255,255,0.025);
+    padding: 14px 15px;
+  }
+
+  .token-box h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+  }
+
+  .token-box ul {
+    margin: 0;
+    padding-left: 18px;
+    color: #c7d7e5;
+  }
+
+  .token-box li {
+    margin: 6px 0;
+    line-height: 1.7;
+    font-size: 13px;
+  }
+
+  .compare {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .compare th,
+  .compare td {
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 11px 10px;
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.65;
+  }
+
+  .compare th {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .compare tr:last-child td { border-bottom: none; }
+
+  .footer-note {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 209, 102, 0.24);
+    background: rgba(255, 209, 102, 0.05);
+    font-size: 13px;
+    line-height: 1.75;
+    color: #d9d0b6;
+  }
+
+  @media (max-width: 1100px) {
+    .pipeline { grid-template-columns: 1fr 1fr; }
+    .grid-2, .hero-grid, .token-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 760px) {
+    .page { width: min(100vw - 20px, 1280px); }
+    .hero { padding: 24px 20px; }
+    .pipeline { grid-template-columns: 1fr; }
+    .lane { grid-template-columns: 1fr; }
+    .abi-row { grid-template-columns: 1fr; }
+    .summary-item { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="eyebrow">Optimism / Deposit Lifecycle / L1 → L2</div>
+      <h1>DepositTx 完整生命周期</h1>
+      <div class="subtitle">
+        这张图把一笔 L1 存款从 <span class="mono">OptimismPortal2.emit(TransactionDeposited)</span> 开始，
+        一直到 <span class="mono">op-node</span> 派生、<span class="mono">Engine API</span> 构建、
+        执行引擎落地为 <span class="mono">ExecutionPayload</span>，以及 L2 合约链路执行的关键节点串成一条完整路径。
+      </div>
+
+      <div class="hero-grid">
+        <div class="mini-panel">
+          <div class="mini-title">核心对象</div>
+          <div class="chips">
+            <div class="chip cyan">TransactionDeposited</div>
+            <div class="chip orange">DepositTx (type 0x7E)</div>
+            <div class="chip green">PayloadAttributes</div>
+            <div class="chip yellow">ExecutionPayload</div>
+            <div class="chip pink">L1InfoDepositTx</div>
+            <div class="chip violet">SafeCall.call</div>
+          </div>
+        </div>
+        <div class="mini-panel">
+          <div class="mini-title">一句话摘要</div>
+          <div class="summary-list">
+            <div class="summary-item"><div class="k">保证来源</div><div>存款不是 sequencer 自由选择上链，而是由 L1 日志和固定规则确定性派生。</div></div>
+            <div class="summary-item"><div class="k">执行顺序</div><div>每个 L2 块先执行 <span class="mono">L1InfoDepositTx</span>，然后再执行用户存款 DepositTx。</div></div>
+            <div class="summary-item"><div class="k">L2 语义</div><div>DepositTx 不验签、不走普通 nonce 路径，并支持 <span class="mono">mint</span> 语义。</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pipeline">
+      <div class="stage cyan">
+        <div class="stage-no">01</div>
+        <h2>L1 事件</h2>
+        <p>Portal 在 L1 上发出 <span class="mono">TransactionDeposited</span>，把跨链执行所需字段编码进 log。</p>
+      </div>
+      <div class="stage orange">
+        <div class="stage-no">02</div>
+        <h2>派生 DepositTx</h2>
+        <p><span class="mono">op-node</span> 在新 epoch 首块扫描 receipts，解析事件并构造用户 DepositTx。</p>
+      </div>
+      <div class="stage green">
+        <div class="stage-no">03</div>
+        <h2>构建属性</h2>
+        <p>把 <span class="mono">L1InfoDepositTx</span>、用户 DepositTx 和升级交易装入 <span class="mono">PayloadAttributes</span>。</p>
+      </div>
+      <div class="stage yellow">
+        <div class="stage-no">04</div>
+        <h2>L2 执行</h2>
+        <p>执行引擎按顺序执行交易，最终产出 <span class="mono">ExecutionPayload</span> 并完成合约调用链。</p>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">阶段一：L1 事件编码</div>
+            <div class="card-sub">OptimismPortal2.depositTransaction()</div>
+          </div>
+          <div class="chip cyan">log → raw input</div>
+        </div>
+        <div class="card-body">
+          <div class="event-abi">
+            <div class="abi-row">
+              <div class="k">topics[0]</div>
+              <div class="v"><span class="mono">keccak256("TransactionDeposited(address,address,uint256,bytes)")</span></div>
+            </div>
+            <div class="abi-row">
+              <div class="k">topics[1]</div>
+              <div class="v"><span class="mono">from</span>。若调用方是 L1 合约，会先做地址别名，避免 L1 合约伪装成同地址 L2 账户。</div>
+            </div>
+            <div class="abi-row">
+              <div class="k">topics[2]</div>
+              <div class="v"><span class="mono">to</span>。目标 L2 合约或 EOA 地址。</div>
+            </div>
+            <div class="abi-row">
+              <div class="k">topics[3]</div>
+              <div class="v"><span class="mono">version</span>。当前为 <span class="mono">0</span>，供未来事件格式升级保留版本位。</div>
+            </div>
+            <div class="abi-row">
+              <div class="k">data</div>
+              <div class="v"><span class="mono">abi.encodePacked(mint, value, gasLimit, isCreation, data)</span>，保存 mint/value/gas 和 calldata。</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">阶段二：新 epoch / 同 epoch 分支</div>
+            <div class="card-sub">PreparePayloadAttributes()</div>
+          </div>
+          <div class="chip orange">branching</div>
+        </div>
+        <div class="card-body">
+          <div class="branch">
+            <div class="branch-box cyan">
+              <div class="branch-title">
+                <strong>新 epoch 首块</strong>
+                <span>扫描 receipts</span>
+              </div>
+              <div class="steps">
+                <div class="step-row"><div class="step-idx">1</div><div class="step-text">读取目标 L1 origin 区块的 receipts。</div></div>
+                <div class="step-row"><div class="step-idx">2</div><div class="step-text">筛出 <span class="mono">TransactionDeposited</span> 事件。</div></div>
+                <div class="step-row"><div class="step-idx">3</div><div class="step-text">调用 <span class="mono">UnmarshalDepositLogEvent</span> 解码出 <span class="mono">from/to/mint/value/gas/data</span>。</div></div>
+                <div class="step-row"><div class="step-idx">4</div><div class="step-text">按 <span class="mono">l1BlockHash + logIndex</span> 生成确定性 <span class="mono">sourceHash</span>。</div></div>
+              </div>
+            </div>
+            <div class="branch-box orange">
+              <div class="branch-title">
+                <strong>同 epoch 后续块</strong>
+                <span>通常无用户 deposit</span>
+              </div>
+              <div class="steps">
+                <div class="step-row"><div class="step-idx">1</div><div class="step-text">不再重复扫描 receipts。</div></div>
+                <div class="step-row"><div class="step-idx">2</div><div class="step-text">只继续生成新的 <span class="mono">L1InfoDepositTx</span>。</div></div>
+                <div class="step-row"><div class="step-idx">3</div><div class="step-text">sequencer 块是否有普通交易，取决于本地 tx pool 和模式配置。</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="card" style="margin-bottom:16px;">
+      <div class="card-head">
+        <div>
+          <div class="card-title">阶段三：从日志到 PayloadAttributes</div>
+          <div class="card-sub">derive/deposits.go + derive/attributes.go + derive/l1_block_info.go</div>
+        </div>
+        <div class="chip green">assembly line</div>
+      </div>
+      <div class="card-body">
+        <div class="journey">
+          <div class="lane">
+            <div class="lane-label">L1 Log / Receipt</div>
+            <div class="lane-track">
+              <div class="journey-node cyan">
+                <h3>读取 receipt 并过滤事件</h3>
+                <p><span class="mono">UserDeposits()</span> 逐个 receipt 检查执行成功状态、log 地址以及 event topic，只提取来自 Portal 的有效 deposit 事件。</p>
+              </div>
+            </div>
+          </div>
+          <div class="lane">
+            <div class="lane-label">Deposit Decoder</div>
+            <div class="lane-track">
+              <div class="journey-node orange">
+                <h3>UnmarshalDepositLogEvent</h3>
+                <p>从 topics 解析 <span class="mono">from / to / version</span>，从 opaque data 解析 <span class="mono">mint / value / gas / isCreation / data</span>，得到 <span class="mono">types.DepositTx</span> 的核心字段。</p>
+              </div>
+              <div class="journey-node violet">
+                <h3>sourceHash 确定性身份</h3>
+                <p>用户 deposit 走 domain=0 规则，使用 <span class="mono">keccak256(domain || keccak256(l1BlockHash || logIndex))</span> 作为唯一来源标识。</p>
+              </div>
+            </div>
+          </div>
+          <div class="lane">
+            <div class="lane-label">L1Info Builder</div>
+            <div class="lane-track">
+              <div class="journey-node pink">
+                <h3>L1InfoDepositTx 永远在最前</h3>
+                <p><span class="mono">L1InfoDeposit()</span> 构造一笔系统 deposit tx，把 L1 block number、timestamp、basefee、batcherHash、fee scalar 等写入 L2 的 <span class="mono">L1Block</span> 预部署合约。</p>
+              </div>
+            </div>
+          </div>
+          <div class="lane">
+            <div class="lane-label">PayloadAttributes</div>
+            <div class="lane-track">
+              <div class="journey-node green">
+                <h3>交易顺序被固定</h3>
+                <p><span class="mono">txs = [L1InfoDepositTx] + [UserDepositTx...] + [UpgradeTx...] (+ 普通交易，sequencer 模式下)</span>。验证者模式通常开启 <span class="mono">NoTxPool=true</span>，只允许确定性派生交易进入区块。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">阶段四：Engine API 与区块产出</div>
+            <div class="card-sub">engine_forkchoiceUpdatedV3 / engine_getPayloadV3</div>
+          </div>
+          <div class="chip yellow">build + seal</div>
+        </div>
+        <div class="card-body">
+          <div class="steps">
+            <div class="step-row"><div class="step-idx">1</div><div class="step-text"><span class="mono">BuildStartEvent</span> 驱动 <span class="mono">engine_forkchoiceUpdatedV3</span>，EL 返回 <span class="mono">PayloadID</span>。</div></div>
+            <div class="step-row"><div class="step-idx">2</div><div class="step-text">EL 内部依据 <span class="mono">PayloadAttributes.Transactions</span> 按序执行交易。</div></div>
+            <div class="step-row"><div class="step-idx">3</div><div class="step-text"><span class="mono">engine_getPayloadV3</span> 取回 <span class="mono">ExecutionPayload</span>。</div></div>
+            <div class="step-row"><div class="step-idx">4</div><div class="step-text"><span class="mono">sanityCheckPayload()</span> 校验 deposit 必须连续排在最前，避免引擎返回非规范顺序区块。</div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">DepositTx vs 普通交易</div>
+            <div class="card-sub">execution semantics</div>
+          </div>
+          <div class="chip violet">type 0x7E</div>
+        </div>
+        <div class="card-body">
+          <table class="compare">
+            <thead>
+              <tr>
+                <th>维度</th>
+                <th>普通 L2 交易</th>
+                <th>DepositTx</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>签名</td>
+                <td>必须验签</td>
+                <td>不验签，<span class="mono">from</span> 由 L1 日志直接给出</td>
+              </tr>
+              <tr>
+                <td>Nonce</td>
+                <td>走普通 nonce 规则</td>
+                <td>跳过普通 nonce 递增约束</td>
+              </tr>
+              <tr>
+                <td>Gas 费用</td>
+                <td>从 L2 余额扣 gas</td>
+                <td>不走普通 L2 gas 扣款路径，L1 入口已做 metering</td>
+              </tr>
+              <tr>
+                <td>Mint</td>
+                <td>无</td>
+                <td><span class="mono">mint &gt; 0</span> 时可先为发送方增加余额</td>
+              </tr>
+              <tr>
+                <td>失败语义</td>
+                <td>状态随交易回滚</td>
+                <td>调用失败时，已发生的 mint 不会因为子调用失败而撤销</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="card" style="margin-bottom:16px;">
+      <div class="card-head">
+        <div>
+          <div class="card-title">阶段五：L2 合约调用链</div>
+          <div class="card-sub">CrossDomainMessenger / StandardBridge / SafeCall</div>
+        </div>
+        <div class="chip pink">contract execution</div>
+      </div>
+      <div class="card-body">
+        <div class="token-grid">
+          <div class="token-box">
+            <h3 style="color: var(--orange);">ETH 存款路径</h3>
+            <ul>
+              <li>DepositTx 的 <span class="mono">to</span> 一般是 L2 上的 <span class="mono">L2CrossDomainMessenger</span>。</li>
+              <li>先执行 <span class="mono">relayMessage()</span>，验证 <span class="mono">msg.sender</span> 逆别名后确实来自 L1 messenger。</li>
+              <li>随后通过 <span class="mono">SafeCall.call()</span> 调到 <span class="mono">L2StandardBridge.finalizeBridgeETH()</span>。</li>
+              <li>最终再由 bridge 通过 <span class="mono">SafeCall.call(to, value, "")</span> 把 ETH 转给接收者。</li>
+            </ul>
+          </div>
+          <div class="token-box">
+            <h3 style="color: var(--green);">ERC20 存款路径</h3>
+            <ul>
+              <li>DepositTx 本身通常 <span class="mono">value=0</span>、<span class="mono">mint=0</span>，只负责把跨域消息带到 L2。</li>
+              <li><span class="mono">L2StandardBridge.finalizeBridgeERC20()</span> 检查本地 token 是否为 <span class="mono">OptimismMintableERC20</span>。</li>
+              <li>通过本地 token 的 <span class="mono">mint(to, amount)</span> 在 L2 铸造对应份额。</li>
+              <li>因此 ERC20 的“资产落地”发生在 token 合约 mint，而不是 DepositTx 自身的 ETH mint 语义。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="footer-note">
+          <strong>为什么 SafeCall 关键：</strong>
+          <span class="mono">SafeCall.call()</span> 在底层使用 EVM <span class="mono">CALL</span>，但默认不复制返回数据，
+          可以避免 returndata bomb，并通过 <span class="mono">hasMinGas</span> 检查 EIP-150 下子调用是否还能拿到足够 gas。
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

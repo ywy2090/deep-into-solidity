@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L1→L2 消息编码流程图</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #080d18;
+    --surface: #0e1623;
+    --card:    #111d2e;
+    --border:  #1c2d42;
+    --sep:     #243550;
+
+    --c1: #00d4ff;  /* 用户参数  */
+    --c2: #ff6b35;  /* 目标地址  */
+    --c3: #4ade80;  /* 消息数据  */
+    --c4: #facc15;  /* Gas      */
+    --c5: #c084fc;  /* ETH      */
+    --c6: #f472b6;  /* Nonce    */
+    --cm: #475569;  /* 注释灰   */
+    --ci: #64748b;  /* 斜体注释  */
+
+    --text: #cbd5e1;
+    --head: #e2e8f0;
+
+    --fn1: #00d4ff;
+    --fn2: #ff6b35;
+    --fn3: #4ade80;
+    --fn4: #facc15;
+    --fn5: #c084fc;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans SC', sans-serif;
+    padding: 28px 24px 56px;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  /* ── 标题区 ── */
+  .page-title {
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: var(--c1);
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+  }
+  .page-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--cm);
+    margin-bottom: 20px;
+  }
+
+  /* ── 图例 ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    margin-bottom: 28px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .leg {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+  }
+  .leg-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── 步骤卡片 ── */
+  .step {
+    position: relative;
+    margin-bottom: 0;
+    animation: fadeIn 0.35s ease both;
+  }
+  .step:nth-child(1) { animation-delay: 0.05s; }
+  .step:nth-child(2) { animation-delay: 0.12s; }
+  .step:nth-child(3) { animation-delay: 0.19s; }
+  .step:nth-child(4) { animation-delay: 0.26s; }
+  .step:nth-child(5) { animation-delay: 0.33s; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* 左边竖线 */
+  .step-body {
+    display: grid;
+    grid-template-columns: 3px 1fr;
+    gap: 0 14px;
+  }
+  .step-line {
+    width: 3px;
+    border-radius: 3px;
+    margin-top: 2px;
+  }
+
+  /* 卡片内容 */
+  .step-content {
+    padding-bottom: 4px;
+  }
+
+  /* 函数标题行 */
+  .fn-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .fn-badge {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+  .fn-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .fn-desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--cm);
+    font-style: italic;
+  }
+
+  /* 参数/代码块 */
+  .code-block {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.71rem;
+    line-height: 1.85;
+    margin-bottom: 8px;
+  }
+  .code-block .row {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+    white-space: nowrap;
+  }
+  .code-block .param-name {
+    min-width: 120px;
+    display: inline-block;
+  }
+  .code-block .param-type {
+    min-width: 80px;
+    display: inline-block;
+    color: var(--cm);
+  }
+  .code-block .param-comment {
+    color: var(--cm);
+    font-style: italic;
+  }
+  .code-block .separator {
+    height: 1px;
+    background: var(--sep);
+    margin: 6px 0;
+  }
+
+  /* 转换框 */
+  .transform-block {
+    background: var(--surface);
+    border: 1px dashed var(--sep);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.71rem;
+    line-height: 1.85;
+    margin-bottom: 8px;
+  }
+  .transform-block .t-label {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--c4);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .transform-block .row {
+    display: flex;
+    align-items: baseline;
+    white-space: nowrap;
+  }
+  .transform-block .param-name {
+    min-width: 100px;
+    display: inline-block;
+  }
+
+  /* 连接箭头 */
+  .connector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0 6px 17px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--cm);
+  }
+  .connector .arrow-line {
+    width: 2px;
+    height: 28px;
+    border-radius: 1px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .connector .arrow-line::after {
+    content: '▼';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+  }
+  .connector .arrow-label {
+    margin-left: 8px;
+    font-style: italic;
+  }
+
+  /* 颜色变量 */
+  .p1 { color: var(--c1); }
+  .p2 { color: var(--c2); }
+  .p3 { color: var(--c3); }
+  .p4 { color: var(--c4); }
+  .p5 { color: var(--c5); }
+  .p6 { color: var(--c6); }
+  .pm { color: var(--cm); }
+  .pi { color: var(--ci); font-style: italic; }
+
+  /* 步骤颜色绑定 */
+  .s1 .step-line { background: var(--fn1); }
+  .s1 .fn-badge { color: var(--fn1); border-color: var(--fn1); }
+  .s1 .fn-name  { color: var(--fn1); }
+  .s1 .code-block { border-color: rgba(0,212,255,0.3); border-left: 3px solid var(--fn1); }
+  .s1 .connector .arrow-line { background: var(--fn1); }
+  .s1 .connector .arrow-line::after { color: var(--fn1); }
+
+  .s2 .step-line { background: var(--fn2); }
+  .s2 .fn-badge { color: var(--fn2); border-color: var(--fn2); }
+  .s2 .fn-name  { color: var(--fn2); }
+  .s2 .code-block { border-color: rgba(255,107,53,0.3); border-left: 3px solid var(--fn2); }
+  .s2 .connector .arrow-line { background: var(--fn2); }
+  .s2 .connector .arrow-line::after { color: var(--fn2); }
+
+  .s3 .step-line { background: var(--fn3); }
+  .s3 .fn-badge { color: var(--fn3); border-color: var(--fn3); }
+  .s3 .fn-name  { color: var(--fn3); }
+  .s3 .code-block { border-color: rgba(74,222,128,0.3); border-left: 3px solid var(--fn3); }
+  .s3 .connector .arrow-line { background: var(--fn3); }
+  .s3 .connector .arrow-line::after { color: var(--fn3); }
+
+  .s4 .step-line { background: var(--fn4); }
+  .s4 .fn-badge { color: var(--fn4); border-color: var(--fn4); }
+  .s4 .fn-name  { color: var(--fn4); }
+  .s4 .code-block { border-color: rgba(250,204,21,0.3); border-left: 3px solid var(--fn4); }
+  .s4 .connector .arrow-line { background: var(--fn4); }
+  .s4 .connector .arrow-line::after { color: var(--fn4); }
+
+  .s5 .step-line { background: var(--fn5); }
+  .s5 .fn-badge { color: var(--fn5); border-color: var(--fn5); }
+  .s5 .fn-name  { color: var(--fn5); }
+  .s5 .code-block { border-color: rgba(192,132,252,0.3); border-left: 3px solid var(--fn5); }
+
+  /* ── 底部详情区 ── */
+  .detail-section {
+    margin-top: 32px;
+    border-top: 1px solid var(--sep);
+    padding-top: 24px;
+  }
+  .detail-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--c4);
+    margin-bottom: 14px;
+    letter-spacing: 0.5px;
+  }
+  .detail-sub {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--c3);
+    margin: 16px 0 8px;
+  }
+
+  /* 字节布局 */
+  .byte-bar {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    margin-bottom: 12px;
+  }
+  .bf {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 6px;
+    text-align: center;
+    min-width: 0;
+    border-right: 1px solid var(--border);
+    line-height: 1.5;
+  }
+  .bf:last-child { border-right: none; }
+  .bf-range { font-size: 0.58rem; color: var(--cm); }
+  .bf-n { font-weight: 700; }
+  .bf-type { font-size: 0.58rem; color: var(--cm); font-style: italic; }
+  .bf-a { background: rgba(192,132,252,0.1); flex: 2; }
+  .bf-b { background: rgba(0,212,255,0.1);   flex: 2; }
+  .bf-c { background: rgba(250,204,21,0.1);  flex: 1.4; }
+  .bf-d { background: rgba(74,222,128,0.1);  flex: 0.7; }
+  .bf-e { background: rgba(255,107,53,0.1);  flex: 4; }
+
+  /* 表格式字段列表 */
+  .field-table {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    margin-bottom: 12px;
+  }
+  .ft-row {
+    display: grid;
+    grid-template-columns: 110px 70px 1fr;
+    align-items: center;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    line-height: 1.5;
+  }
+  .ft-row:last-child { border-bottom: none; }
+  .ft-row:nth-child(even) { background: rgba(255,255,255,0.02); }
+  .ft-name { font-weight: 600; }
+  .ft-size { color: var(--cm); font-size: 0.62rem; }
+  .ft-desc { color: var(--text); }
+
+  /* op-node 区域 */
+  .opnode-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .opnode-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    line-height: 1.8;
+  }
+  .opnode-card .card-title {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--c3);
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--sep);
+    padding-bottom: 4px;
+  }
+  .opnode-card .oc-row {
+    display: flex;
+    align-items: baseline;
+  }
+  .opnode-card .oc-key {
+    min-width: 88px;
+    display: inline-block;
+    color: var(--cm);
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">L1 → L2 消息编码流程</div>
+<div class="page-sub">bridgeETH → _initiateBridgeETH → sendMessage → _sendMessage → depositTransaction</div>
+
+<!-- 图例 -->
+<div class="legend">
+  <div class="leg"><div class="leg-dot" style="background:var(--c1)"></div><span class="p1">用户参数（原始输入）</span></div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c2)"></div><span class="p2">目标地址</span></div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c3)"></div><span class="p3">消息数据（不断包装）</span></div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c4)"></div><span class="p4">Gas 参数</span></div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c5)"></div><span class="p5">ETH 数值</span></div>
+  <div class="leg"><div class="leg-dot" style="background:var(--c6)"></div><span class="p6">Nonce / 版本</span></div>
+  <div class="leg"><div class="leg-dot" style="background:var(--cm)"></div><span class="pm">注释 / 计算值</span></div>
+</div>
+
+<!-- ════════════════════ STEP 1 ════════════════════ -->
+<div class="step s1">
+  <div class="step-body">
+    <div class="step-line"></div>
+    <div class="step-content">
+
+      <div class="fn-header">
+        <div class="fn-badge">①</div>
+        <div>
+          <div class="fn-name">L1StandardBridge.bridgeETH()</div>
+          <div class="fn-desc">// 用户入口，仅 EOA 可调用（onlyEOA 修饰符）</div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="row"><span class="param-name p4">_minGasLimit</span><span class="param-type">uint32</span><span class="param-comment">// 用户指定的 L2 最小 gas 限制</span></div>
+        <div class="row"><span class="param-name p3">_extraData</span><span class="param-type">bytes</span><span class="param-comment">// 附加数据（仅记录在事件中，不影响执行）</span></div>
+        <div class="row"><span class="param-name p5">{ value: msg.value }</span><span class="param-type"></span><span class="param-comment">// 附带的 ETH（即桥接金额）</span></div>
+      </div>
+
+      <div class="transform-block">
+        <span class="t-label">→ 直接透传展开为 _initiateBridgeETH 的 5 个参数</span>
+        <div class="row"><span class="param-name pm">_from</span><span>= msg.sender <span class="pm">// L1 发送方</span></span></div>
+        <div class="row"><span class="param-name pm">_to</span><span>= msg.sender <span class="pm">// bridgeETH 时 from == to</span></span></div>
+        <div class="row"><span class="param-name p5">_amount</span><span class="p5">= msg.value <span class="pm">// ETH 金额</span></span></div>
+        <div class="row"><span class="param-name p4">_minGasLimit</span><span class="p4">= _minGasLimit <span class="pm">// 透传</span></span></div>
+        <div class="row"><span class="param-name p3">_extraData</span><span class="p3">= _extraData <span class="pm">// 透传</span></span></div>
+      </div>
+
+    </div>
+  </div>
+  <div class="connector">
+    <div class="arrow-line"></div>
+    <span class="arrow-label">调用 _initiateBridgeETH()</span>
+  </div>
+</div>
+
+<!-- ════════════════════ STEP 2 ════════════════════ -->
+<div class="step s2">
+  <div class="step-body">
+    <div class="step-line"></div>
+    <div class="step-content">
+
+      <div class="fn-header">
+        <div class="fn-badge">②</div>
+        <div>
+          <div class="fn-name">StandardBridge._initiateBridgeETH()</div>
+          <div class="fn-desc">// 构造 finalizeBridgeETH 调用数据，通过 Messenger 发送</div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="row"><span class="param-name p1">_from</span><span class="param-type">address</span><span class="param-comment">// L1 存款方地址</span></div>
+        <div class="row"><span class="param-name p2">_to</span><span class="param-type">address</span><span class="param-comment">// L2 接收方地址</span></div>
+        <div class="row"><span class="param-name p5">_amount</span><span class="param-type">uint256</span><span class="param-comment">// ETH 数量</span></div>
+        <div class="row"><span class="param-name p4">_minGasLimit</span><span class="param-type">uint32</span><span class="param-comment">// 最小 gas 限制（透传）</span></div>
+        <div class="row"><span class="param-name p3">_extraData</span><span class="param-type">bytes</span><span class="param-comment">// 附加数据（透传）</span></div>
+      </div>
+
+      <div class="transform-block">
+        <span class="t-label">→ 将参数编码为 Level-1 消息体 _message（约 164 bytes）</span>
+        <div class="row"><span class="param-name p3">_message</span><span>= abi.encodeWithSelector(</span></div>
+        <div class="row"><span class="param-name"></span><span class="pm">&nbsp;&nbsp;finalizeBridgeETH.selector,  <span class="pi">// 0x1635f5fd</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p1">_from</span>, <span class="p2">_to</span>, <span class="p5">_amount</span>, <span class="p3">_extraData</span></span></div>
+        <div class="row"><span class="param-name"></span><span>)</span></div>
+        <div class="separator" style="height:1px;background:var(--sep);margin:6px 0;"></div>
+        <div class="row"><span class="pm">调用&nbsp;</span><span>messenger.sendMessage<span class="p5">{ value: _amount }</span>(</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p2">otherBridge</span>, <span class="pm">// L2StandardBridge 地址</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p3">_message</span>,</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p4">_minGasLimit</span></span></div>
+        <div class="row"><span class="param-name"></span><span>)</span></div>
+      </div>
+
+    </div>
+  </div>
+  <div class="connector">
+    <div class="arrow-line"></div>
+    <span class="arrow-label">调用 CrossDomainMessenger.sendMessage()</span>
+  </div>
+</div>
+
+<!-- ════════════════════ STEP 3 ════════════════════ -->
+<div class="step s3">
+  <div class="step-body">
+    <div class="step-line"></div>
+    <div class="step-content">
+
+      <div class="fn-header">
+        <div class="fn-badge">③</div>
+        <div>
+          <div class="fn-name">CrossDomainMessenger.sendMessage()</div>
+          <div class="fn-desc">// 封装为 relayMessage 调用数据 + 计算 gas</div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="row"><span class="param-name p2">_target</span><span class="param-type">address</span><span class="param-comment">// otherBridge（L2StandardBridge）</span></div>
+        <div class="row"><span class="param-name p3">_message</span><span class="param-type">bytes</span><span class="param-comment">// finalizeBridgeETH 编码（来自 ②）</span></div>
+        <div class="row"><span class="param-name p4">_minGasLimit</span><span class="param-type">uint32</span><span class="param-comment">// 用户指定的最小 gas（透传）</span></div>
+        <div class="row"><span class="param-name p5">{ value: msg.value }</span><span class="param-type"></span><span class="param-comment">// ETH 透传</span></div>
+      </div>
+
+      <div class="transform-block">
+        <span class="t-label">→ 两个关键转换：① 生成版本化 nonce，② 计算 gasLimit，③ 编码 relayMessage</span>
+        <div class="row"><span class="param-name p6">nonce</span><span>= encodeVersionedNonce(msgNonce, <span class="p6">1</span>)</span></div>
+        <div class="row"><span class="param-name pm"></span><span class="pm">  // 高 16 位 = version(1)，低 240 位 = 递增序号</span></div>
+
+        <div class="separator" style="height:1px;background:var(--sep);margin:6px 0;"></div>
+
+        <div class="row"><span class="param-name p4">gasLimit</span><span>= baseGas(<span class="p3">_message</span>, <span class="p4">_minGasLimit</span>)</span></div>
+        <div class="row"><span class="param-name pm"></span><span class="pm">  // = TX_BASE_GAS</span></div>
+        <div class="row"><span class="param-name pm"></span><span class="pm">  //   + RELAY_CONSTANT_OVERHEAD  (200_000)</span></div>
+        <div class="row"><span class="param-name pm"></span><span class="pm">  //   + RELAY_CALL_OVERHEAD      (40_000)</span></div>
+        <div class="row"><span class="param-name pm"></span><span class="pm">  //   + RELAY_RESERVED_GAS       (40_000)</span></div>
+        <div class="row"><span class="param-name pm"></span><span class="pm">  //   + _minGasLimit × 64/63     (EIP-150 缓冲)</span></div>
+        <div class="row"><span class="param-name pm"></span><span class="pm">  //   + calldata 字节费用</span></div>
+
+        <div class="separator" style="height:1px;background:var(--sep);margin:6px 0;"></div>
+
+        <div class="row"><span class="param-name p3">_data</span><span>= abi.encodeWithSelector(</span></div>
+        <div class="row"><span class="param-name"></span><span class="pm">&nbsp;&nbsp;relayMessage.selector,  <span class="pi">// 0xd764ad0b</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p6">nonce</span>,</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p1">msg.sender</span>,        <span class="pm">// = L1StandardBridge</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p2">_target</span>,           <span class="pm">// = L2StandardBridge</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p5">msg.value</span>,         <span class="pm">// ETH 金额</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p4">_minGasLimit</span>,      <span class="pm">// 用户指定 gas</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p3">_message</span>           <span class="pm">// finalizeBridgeETH 编码</span></span></div>
+        <div class="row"><span class="param-name"></span><span>)</span></div>
+
+        <div class="separator" style="height:1px;background:var(--sep);margin:6px 0;"></div>
+
+        <div class="row"><span class="pm">调用&nbsp;</span><span>_sendMessage(</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p2">otherMessenger</span>,  <span class="pm">// L2CrossDomainMessenger</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p4">gasLimit</span>,</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p5">msg.value</span>,</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p3">_data</span></span></div>
+        <div class="row"><span class="param-name"></span><span>)</span></div>
+      </div>
+
+    </div>
+  </div>
+  <div class="connector">
+    <div class="arrow-line"></div>
+    <span class="arrow-label">调用 L1CrossDomainMessenger._sendMessage()</span>
+  </div>
+</div>
+
+<!-- ════════════════════ STEP 4 ════════════════════ -->
+<div class="step s4">
+  <div class="step-body">
+    <div class="step-line"></div>
+    <div class="step-content">
+
+      <div class="fn-header">
+        <div class="fn-badge">④</div>
+        <div>
+          <div class="fn-name">L1CrossDomainMessenger._sendMessage()</div>
+          <div class="fn-desc">// 参数原封不动转发给 OptimismPortal.depositTransaction()</div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="row"><span class="param-name p2">_to</span><span class="param-type">address</span><span class="param-comment">// L2CrossDomainMessenger（otherMessenger）</span></div>
+        <div class="row"><span class="param-name p4">_gasLimit</span><span class="param-type">uint64</span><span class="param-comment">// baseGas() 计算结果</span></div>
+        <div class="row"><span class="param-name p5">_value</span><span class="param-type">uint256</span><span class="param-comment">// ETH（msg.value）</span></div>
+        <div class="row"><span class="param-name p3">_data</span><span class="param-type">bytes</span><span class="param-comment">// relayMessage ABI 编码（来自 ③）</span></div>
+      </div>
+
+      <div class="transform-block">
+        <span class="t-label">→ 参数一一映射到 portal.depositTransaction() 的签名</span>
+        <div class="row"><span class="pm">调用&nbsp;</span><span>portal.depositTransaction<span class="p5">{ value: _value }</span>(</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;_to:         <span class="p2">L2CrossDomainMessenger</span>,</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;_value:      <span class="p5">_value</span>,       <span class="pm">// 接收者得到的 ETH</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;_gasLimit:   <span class="p4">_gasLimit</span>,    <span class="pm">// L2 gas 上限</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;_isCreation: <span class="pm">false</span>,</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;_data:       <span class="p3">_data</span>         <span class="pm">// relayMessage 编码</span></span></div>
+        <div class="row"><span class="param-name"></span><span>)</span></div>
+      </div>
+
+    </div>
+  </div>
+  <div class="connector">
+    <div class="arrow-line"></div>
+    <span class="arrow-label">调用 OptimismPortal2.depositTransaction()</span>
+  </div>
+</div>
+
+<!-- ════════════════════ STEP 5 ════════════════════ -->
+<div class="step s5">
+  <div class="step-body">
+    <div class="step-line"></div>
+    <div class="step-content">
+
+      <div class="fn-header">
+        <div class="fn-badge">⑤</div>
+        <div>
+          <div class="fn-name">OptimismPortal2.depositTransaction()</div>
+          <div class="fn-desc">// 打包 opaqueData，发出 TransactionDeposited 事件</div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="row"><span class="param-name p2">_to</span><span class="param-type">address</span><span class="param-comment">// L2CrossDomainMessenger</span></div>
+        <div class="row"><span class="param-name p5">_value</span><span class="param-type">uint256</span><span class="param-comment">// 发送给接收者的 ETH</span></div>
+        <div class="row"><span class="param-name p4">_gasLimit</span><span class="param-type">uint64</span><span class="param-comment">// L2 gas 上限</span></div>
+        <div class="row"><span class="param-name pm">_isCreation</span><span class="param-type">bool</span><span class="param-comment">// false（非合约创建）</span></div>
+        <div class="row"><span class="param-name p3">_data</span><span class="param-type">bytes</span><span class="param-comment">// relayMessage ABI 编码</span></div>
+      </div>
+
+      <div class="transform-block">
+        <span class="t-label">→ 打包 opaqueData（abi.encodePacked，紧凑非对齐），发出事件</span>
+        <div class="row"><span class="param-name p3">opaqueData</span><span>= abi.encodePacked(</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p5">msg.value</span>,   <span class="pm">// uint256，32 bytes，锁定总 ETH</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p5">_value</span>,      <span class="pm">// uint256，32 bytes，接收者 ETH</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p4">_gasLimit</span>,   <span class="pm">// uint64，8 bytes，L2 gas</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="pm">_isCreation</span>,<span class="pm">// bool，1 byte，0x00</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p3">_data</span>        <span class="pm">// bytes，变长，relayMessage 编码</span></span></div>
+        <div class="row"><span class="param-name"></span><span>)</span></div>
+        <div class="separator" style="height:1px;background:var(--sep);margin:6px 0;"></div>
+        <div class="row"><span class="pm">emit TransactionDeposited(</span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p1">from</span>,        <span class="pm">// alias(L1CrossDomainMessenger)</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p2">_to</span>,         <span class="pm">// L2CrossDomainMessenger</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="pm">version</span>,     <span class="pm">// 0（DEPOSIT_VERSION）</span></span></div>
+        <div class="row"><span class="param-name"></span><span>&nbsp;&nbsp;<span class="p3">opaqueData</span>   <span class="pm">// 上面打包的结果</span></span></div>
+        <div class="row"><span class="param-name"></span><span class="pm">)</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 详情区 ════════════════════ -->
+<div class="detail-section">
+
+  <!-- opaqueData 字节布局 -->
+  <div class="detail-title">▌ opaqueData 字节布局（abi.encodePacked，非对齐紧凑打包）</div>
+  <div class="byte-bar">
+    <div class="bf bf-a">
+      <div class="bf-range">bytes 0–31</div>
+      <div class="bf-n p5">msg.value</div>
+      <div class="bf-type">uint256 · 32B</div>
+    </div>
+    <div class="bf bf-b">
+      <div class="bf-range">bytes 32–63</div>
+      <div class="bf-n p5">_value</div>
+      <div class="bf-type">uint256 · 32B</div>
+    </div>
+    <div class="bf bf-c">
+      <div class="bf-range">bytes 64–71</div>
+      <div class="bf-n p4">_gasLimit</div>
+      <div class="bf-type">uint64 · 8B</div>
+    </div>
+    <div class="bf bf-d">
+      <div class="bf-range">byte 72</div>
+      <div class="bf-n pm">_isCreation</div>
+      <div class="bf-type">bool · 1B</div>
+    </div>
+    <div class="bf bf-e">
+      <div class="bf-range">bytes 73+ (变长)</div>
+      <div class="bf-n p3">_data</div>
+      <div class="bf-type">relayMessage ABI 编码</div>
+    </div>
+  </div>
+
+  <!-- relayMessage 字段 -->
+  <div class="detail-sub">▌ _data 内部结构（relayMessage v1 ABI 编码，0xd764ad0b）</div>
+  <div class="field-table">
+    <div class="ft-row" style="background:var(--surface);">
+      <div class="ft-name pm">字段名</div>
+      <div class="ft-size pm">大小</div>
+      <div class="ft-desc pm">内容说明</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p3">selector</div>
+      <div class="ft-size">4 bytes</div>
+      <div class="ft-desc">0xd764ad0b（relayMessage v1 函数选择器）</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p6">nonce</div>
+      <div class="ft-size">32 bytes</div>
+      <div class="ft-desc">高 16 位 = version(1)，低 240 位 = msgNonce 递增序号</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p1">sender</div>
+      <div class="ft-size">32 bytes</div>
+      <div class="ft-desc">L1StandardBridge 地址（msg.sender of sendMessage）</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p2">target</div>
+      <div class="ft-size">32 bytes</div>
+      <div class="ft-desc">L2StandardBridge 地址（otherBridge）</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p5">value</div>
+      <div class="ft-size">32 bytes</div>
+      <div class="ft-desc">ETH 金额（msg.value）</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p4">minGasLimit</div>
+      <div class="ft-size">32 bytes</div>
+      <div class="ft-desc">用户原始 _minGasLimit（保持不变）</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p3">message</div>
+      <div class="ft-size">变长</div>
+      <div class="ft-desc">offset(32B) + length(32B) + finalizeBridgeETH 编码数据</div>
+    </div>
+  </div>
+
+  <!-- finalizeBridgeETH 字段 -->
+  <div class="detail-sub">▌ message 内部结构（finalizeBridgeETH 原始数据，0x1635f5fd）</div>
+  <div class="field-table">
+    <div class="ft-row" style="background:var(--surface);">
+      <div class="ft-name pm">字段名</div>
+      <div class="ft-size pm">大小</div>
+      <div class="ft-desc pm">内容说明</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p3">selector</div>
+      <div class="ft-size">4 bytes</div>
+      <div class="ft-desc">0x1635f5fd（finalizeBridgeETH 函数选择器）</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p1">_from</div>
+      <div class="ft-size">32 bytes</div>
+      <div class="ft-desc">L1 存款方地址（用户地址）</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p2">_to</div>
+      <div class="ft-size">32 bytes</div>
+      <div class="ft-desc">L2 接收方地址</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p5">_amount</div>
+      <div class="ft-size">32 bytes</div>
+      <div class="ft-desc">ETH 金额</div>
+    </div>
+    <div class="ft-row">
+      <div class="ft-name p3">_extraData</div>
+      <div class="ft-size">变长</div>
+      <div class="ft-desc">offset(32B) + length(32B) + 用户附加数据</div>
+    </div>
+  </div>
+
+  <!-- op-node -->
+  <div class="detail-sub">▌ op-node 派生管道：解析 TransactionDeposited → 构造 L2 DepositTx</div>
+  <div class="opnode-grid">
+    <div class="opnode-card">
+      <div class="card-title">① 解析 opaqueData</div>
+      <div class="oc-row"><span class="oc-key pm">msgValue</span><span>:= opaqueData[0:32] <span class="pm">// uint256</span></span></div>
+      <div class="oc-row"><span class="oc-key pm">value</span><span>:= opaqueData[32:64] <span class="pm">// uint256</span></span></div>
+      <div class="oc-row"><span class="oc-key pm">gasLimit</span><span>:= opaqueData[64:72] <span class="pm">// uint64</span></span></div>
+      <div class="oc-row"><span class="oc-key pm">isCreate</span><span>:= opaqueData[72]    <span class="pm">// bool</span></span></div>
+      <div class="oc-row"><span class="oc-key pm">data</span><span>:= opaqueData[73:]    <span class="pm">// bytes</span></span></div>
+    </div>
+    <div class="opnode-card">
+      <div class="card-title">② 构造 DepositTx（RLP 类型 0x7E）</div>
+      <div class="oc-row"><span class="oc-key pm">SourceHash</span><span>: hash(L1 区块 hash, logIndex)</span></div>
+      <div class="oc-row"><span class="oc-key p1">From</span><span>: <span class="p1">from</span>（事件 indexed 字段）</span></div>
+      <div class="oc-row"><span class="oc-key p2">To</span><span>: <span class="p2">L2CrossDomainMessenger</span></span></div>
+      <div class="oc-row"><span class="oc-key p5">Mint</span><span>: <span class="p5">msgValue</span>（L2 铸造 ETH）</span></div>
+      <div class="oc-row"><span class="oc-key p5">Value</span><span>: <span class="p5">value</span>（发给 to）</span></div>
+      <div class="oc-row"><span class="oc-key p4">Gas</span><span>: <span class="p4">gasLimit</span></span></div>
+      <div class="oc-row"><span class="oc-key p3">Data</span><span>: <span class="p3">data</span>（relayMessage 编码）</span></div>
+    </div>
+  </div>
+  <div style="margin-top:10px; padding:10px 12px; background:var(--card); border:1px solid var(--border); border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:0.68rem; line-height:1.8; color:var(--cm);">
+    <div>L2 执行：<span style="color:var(--c2)">L2CrossDomainMessenger</span>.relayMessage(nonce, sender, target, value, minGas, message)</div>
+    <div>→ 最终调用：<span style="color:var(--c3)">L2StandardBridge</span>.finalizeBridgeETH(_from, _to, _amount, _extraData)</div>
+  </div>
+</div>
+
+</body>
+</html>
