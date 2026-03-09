@@ -53,76 +53,76 @@
 
 ```mermaid
 graph LR
-    subgraph "外部合约"
-        ExternalERC20(外部 ERC20 合约)
-        ExternalERC721(外部 ERC721 合约)
+    subgraph "External Contracts"
+        ExternalERC20(External ERC20 Contracts)
+        ExternalERC721(External ERC721 Contracts)
     end
 
-    subgraph "L1 智能合约"
-        BatchDataEOA(<a href="https://specs.optimism.io/glossary.html#batcher-transaction">批次收件箱地址</a>)
-        L1StandardBridge(<a href="https://specs.optimism.io/protocol/bridges.html">L1StandardBridge</a>)
-        L1ERC721Bridge(<a href="https://specs.optimism.io/protocol/bridges.html">L1ERC721Bridge</a>)
-        L1CrossDomainMessenger(<a href="https://specs.optimism.io/protocol/messengers.html">L1CrossDomainMessenger</a>)
-        OptimismPortal(<a href="https://specs.optimism.io/protocol/withdrawals.html#the-optimism-portal-contract">OptimismPortal</a>)
-        SuperchainConfig(<a href="https://specs.optimism.io/protocol/superchain-config.html">SuperchainConfig</a>)
-        SystemConfig(<a href="https://specs.optimism.io/protocol/system-config.html">SystemConfig</a>)
-        DisputeGameFactory(<a href="https://specs.optimism.io/fault-proof/stage-one/dispute-game-interface.html#disputegamefactory-interface">DisputeGameFactory</a>)
-        FaultDisputeGame(<a href="https://specs.optimism.io/fault-proof/stage-one/fault-dispute-game.html">FaultDisputeGame</a>)
-        AnchorStateRegistry(<a href="https://specs.optimism.io/fault-proof/stage-one/fault-dispute-game.html#anchor-state-registry">AnchorStateRegistry</a>)
-        DelayedWETH(<a href="https://specs.optimism.io/fault-proof/stage-one/bond-incentives.html#delayedweth">DelayedWETH</a>)
+    subgraph "L1 Smart Contracts"
+        BatchDataEOA(<a href="../glossary.html#batcher-transaction">Batch Inbox Address</a>)
+        L1StandardBridge(<a href="./bridges.html">L1StandardBridge</a>)
+        L1ERC721Bridge(<a href="./bridges.html">L1ERC721Bridge</a>)
+        L1CrossDomainMessenger(<a href="./messengers.html">L1CrossDomainMessenger</a>)
+        OptimismPortal(<a href="./withdrawals.html#the-optimism-portal-contract">OptimismPortal</a>)
+        SuperchainConfig(<a href="./superchain-config.html">SuperchainConfig</a>)
+        SystemConfig(<a href="./system-config.html">SystemConfig</a>)
+        DisputeGameFactory(<a href="../fault-proof/stage-one/dispute-game-interface.html#disputegamefactory-interface">DisputeGameFactory</a>)
+        FaultDisputeGame(<a href="../fault-proof/stage-one/fault-dispute-game.html">FaultDisputeGame</a>)
+        AnchorStateRegistry(<a href="../fault-proof/stage-one/fault-dispute-game.html#anchor-state-registry">AnchorStateRegistry</a>)
+        DelayedWETH(<a href="../fault-proof/stage-one/bond-incentives.html#delayedweth#de">DelayedWETH</a>)
     end
 
-    subgraph "用户交互（无需许可）"
-        Users(用户)
-        Challengers(挑战者)
+    subgraph "User Interactions (Permissionless)"
+        Users(Users)
+        Challengers(Challengers)
     end
 
-    subgraph "系统交互"
+    subgraph "System Interactions"
         Guardian(Guardian)
-        Batcher(<a href="https://specs.optimism.io/protocol/batcher.html">Batcher</a>)
+        Batcher(<a href="./batcher.html">Batcher</a>)
     end
 
-    subgraph "二层交互"
-        L2Nodes(L2 节点)
+    subgraph "Layer 2 Interactions"
+        L2Nodes(Layer 2 Nodes)
     end
 
-    L2Nodes -.->|获取交易批次| BatchDataEOA
-    L2Nodes -.->|获取存款事件| OptimismPortal
+    L2Nodes -.->|fetch transaction batches| BatchDataEOA
+    L2Nodes -.->|fetch deposit events| OptimismPortal
 
-    Batcher -->|发布交易批次| BatchDataEOA
+    Batcher -->|publish transaction batches| BatchDataEOA
 
-    ExternalERC20 <-->|铸造/销毁/转移代币| L1StandardBridge
-    ExternalERC721 <-->|铸造/销毁/转移代币| L1ERC721Bridge
+    ExternalERC20 <-->|mint/burn/transfer tokens| L1StandardBridge
+    ExternalERC721 <-->|mint/burn/transfer tokens| L1ERC721Bridge
 
-    L1StandardBridge <-->|发送/接收消息| L1CrossDomainMessenger
-    L1StandardBridge -.->|查询暂停状态| SuperchainConfig
+    L1StandardBridge <-->|send/receive messages| L1CrossDomainMessenger
+    L1StandardBridge -.->|query pause state| SuperchainConfig
 
-    L1ERC721Bridge <-->|发送/接收消息| L1CrossDomainMessenger
-    L1ERC721Bridge -.->|查询暂停状态| SuperchainConfig
+    L1ERC721Bridge <-->|send/receive messages| L1CrossDomainMessenger
+    L1ERC721Bridge -.->|query pause state| SuperchainConfig
 
-    L1CrossDomainMessenger <-->|发送/接收消息| OptimismPortal
-    L1CrossDomainMessenger -.->|查询暂停状态| SuperchainConfig
+    L1CrossDomainMessenger <-->|send/receive messages| OptimismPortal
+    L1CrossDomainMessenger -.->|query pause state| SuperchainConfig
 
-    OptimismPortal -.->|查询暂停状态| SuperchainConfig
-    OptimismPortal -.->|查询配置| SystemConfig
-    OptimismPortal -.->|查询状态提议| DisputeGameFactory
+    OptimismPortal -.->|query pause state| SuperchainConfig
+    OptimismPortal -.->|query config| SystemConfig
+    OptimismPortal -.->|query state proposals| DisputeGameFactory
 
-    DisputeGameFactory -->|生成实例| FaultDisputeGame
+    DisputeGameFactory -->|generate instances| FaultDisputeGame
 
-    FaultDisputeGame -->|存储保证金| DelayedWETH
-    FaultDisputeGame -->|查询/更新锚定状态| AnchorStateRegistry
+    FaultDisputeGame -->|store bonds| DelayedWETH
+    FaultDisputeGame -->|query/update anchor states| AnchorStateRegistry
 
-    Users <-->|存入/提取 ETH/ERC20| L1StandardBridge
-    Users <-->|存入/提取 ERC721| L1ERC721Bridge
-    Users -->|证明/执行提款| OptimismPortal
+    Users <-->|deposit/withdraw ETH/ERC20s| L1StandardBridge
+    Users <-->|deposit/withdraw ERC721s| L1ERC721Bridge
+    Users -->|prove/execute withdrawals| OptimismPortal
 
-    Challengers -->|提出输出根| DisputeGameFactory
-    Challengers -->|验证/挑战/防御提议| FaultDisputeGame
+    Challengers -->|propose output roots| DisputeGameFactory
+    Challengers -->|verify/challenge/defend proposals| FaultDisputeGame
 
-    Guardian -->|暂停/恢复| SuperchainConfig
-    Guardian -->|安全兜底操作| OptimismPortal
-    Guardian -->|安全兜底操作| DisputeGameFactory
-    Guardian -->|安全兜底操作| DelayedWETH
+    Guardian -->|pause/unpause| SuperchainConfig
+    Guardian -->|safety net actions| OptimismPortal
+    Guardian -->|safety net actions| DisputeGameFactory
+    Guardian -->|safety net actions| DelayedWETH
 
     classDef extContracts stroke:#ff9,stroke-width:2px;
     classDef l1Contracts stroke:#bbf,stroke-width:2px;
@@ -152,62 +152,62 @@ graph LR
 
 ```mermaid
 graph LR
-    subgraph "第一层（Ethereum）"
-        L1SmartContracts(L1 智能合约)
+    subgraph "Layer 1 (Ethereum)"
+        L1SmartContracts(L1 Smart Contracts)
     end
 
-    subgraph "L2 客户端"
-        L2Node(L2 节点)
+    subgraph "L2 Client"
+        L2Node(L2 Node)
     end
 
-    subgraph "L2 系统合约"
-        L1Block(<a href="https://specs.optimism.io/protocol/predeploys.html#l1block">L1Block</a>)
-        GasPriceOracle(<a href="https://specs.optimism.io/protocol/predeploys.html#gaspriceoracle">GasPriceOracle</a>)
-        L1FeeVault(<a href="https://specs.optimism.io/protocol/predeploys.html#l1feevault">L1FeeVault</a>)
-        BaseFeeVault(<a href="https://specs.optimism.io/protocol/predeploys.html#basefeevault">BaseFeeVault</a>)
-        SequencerFeeVault(<a href="https://specs.optimism.io/protocol/predeploys.html#sequencerfeevault">SequencerFeeVault</a>)
+    subgraph "L2 System Contracts"
+        L1Block(<a href="./predeploys.html#l1block">L1Block</a>)
+        GasPriceOracle(<a href="./predeploys.html#gaspriceoracle">GasPriceOracle</a>)
+        L1FeeVault(<a href="./predeploys.html#l1feevault">L1FeeVault</a>)
+        BaseFeeVault(<a href="./predeploys.html#basefeevault">BaseFeeVault</a>)
+        SequencerFeeVault(<a href="./predeploys.html#sequencerfeevault">SequencerFeeVault</a>)
     end
 
-    subgraph "L2 桥接合约"
-        L2CrossDomainMessenger(<a href="https://specs.optimism.io/protocol/predeploys.html#l2crossdomainmessenger">L2CrossDomainMessenger</a>)
-        L2ToL1MessagePasser(<a href="https://specs.optimism.io/protocol/predeploys.html#l2tol1messagepasser">L2ToL1MessagePasser</a>)
-        L2StandardBridge(<a href="https://specs.optimism.io/protocol/predeploys.html#l2standardbridge">L2StandardBridge</a>)
-        L2ERC721Bridge(<a href="https://specs.optimism.io/protocol/predeploys.html#l2erc721bridge">L2ERC721Bridge</a>)
+    subgraph "L2 Bridge Contracts"
+        L2CrossDomainMessenger(<a href="./predeploys.html#l2crossdomainmessenger">L2CrossDomainMessenger</a>)
+        L2ToL1MessagePasser(<a href="./predeploys.html#l2tol1messagepasser">L2ToL1MessagePasser</a>)
+        L2StandardBridge(<a href="./predeploys.html#l2standardbridge">L2StandardBridge</a>)
+        L2ERC721Bridge(<a href="./predeploys.html">L2ERC721Bridge</a>)
     end
 
-    subgraph "交易"
-        DepositTransaction(存款交易)
-        UserTransaction(用户交易)
+    subgraph "Transactions"
+        DepositTransaction(Deposit Transaction)
+        UserTransaction(User Transaction)
     end
 
-    subgraph "外部合约"
-        ExternalERC20(外部 ERC20 合约)
-        ExternalERC721(外部 ERC721 合约)
+    subgraph "External Contracts"
+        ExternalERC20(External ERC20 Contracts)
+        ExternalERC721(External ERC721 Contracts)
     end
 
-    subgraph "L2 其余世界"
-        OtherContracts(任意合约与地址)
+    subgraph "Remaining L2 Universe"
+        OtherContracts(Any Contracts and Addresses)
     end
 
-    L2Node -.->|从中派生链| L1SmartContracts
-    L2Node -->|更新| L1Block
-    L2Node -->|分配手续费给| L1FeeVault
-    L2Node -->|分配手续费给| BaseFeeVault
-    L2Node -->|分配手续费给| SequencerFeeVault
-    L2Node -->|由存款派生| DepositTransaction
-    L2Node -->|由链上数据派生| UserTransaction
+    L2Node -.->|derives chain from| L1SmartContracts
+    L2Node -->|updates| L1Block
+    L2Node -->|distributes fees to| L1FeeVault
+    L2Node -->|distributes fees to| BaseFeeVault
+    L2Node -->|distributes fees to| SequencerFeeVault
+    L2Node -->|derives from deposits| DepositTransaction
+    L2Node -->|derives from chain data| UserTransaction
 
-    UserTransaction -->|可以触发| OtherContracts
-    DepositTransaction -->|可能触发| L2CrossDomainMessenger
-    DepositTransaction -->|可以触发| OtherContracts
+    UserTransaction -->|can trigger| OtherContracts
+    DepositTransaction -->|maybe triggers| L2CrossDomainMessenger
+    DepositTransaction -->|can trigger| OtherContracts
 
-    ExternalERC20 <-->|铸造/销毁/转移| L2StandardBridge
-    ExternalERC721 <-->|铸造/销毁/转移| L2ERC721Bridge
+    ExternalERC20 <-->|mint/burn/transfer| L2StandardBridge
+    ExternalERC721 <-->|mint/burn/transfer| L2ERC721Bridge
 
-    L2StandardBridge <-->|发送/接收消息| L2CrossDomainMessenger
-    L2ERC721Bridge <-->|发送/接收消息| L2CrossDomainMessenger
-    GasPriceOracle -.->|查询| L1Block
-    L2CrossDomainMessenger -->|发送消息| L2ToL1MessagePasser
+    L2StandardBridge <-->|sends/receives messages| L2CrossDomainMessenger
+    L2ERC721Bridge <-->|sends/receives messages| L2CrossDomainMessenger
+    GasPriceOracle -.->|queries| L1Block
+    L2CrossDomainMessenger -->|sends messages| L2ToL1MessagePasser
 
     classDef extContracts stroke:#ff9,stroke-width:2px;
     classDef l2Contracts stroke:#bbf,stroke-width:2px;
@@ -235,16 +235,16 @@ graph LR
 
 ```mermaid
 graph LR
-    ProxyAdminOwner(Proxy 管理员所有者)
+    ProxyAdminOwner(Proxy Admin Owner)
     ProxyAdmin(<a href="https://github.com/ethereum-optimism/optimism/blob/develop/packages/contracts-bedrock/src/universal/ProxyAdmin.sol">ProxyAdmin</a>)
 
-    subgraph "逻辑智能合约"
+    subgraph "Logical Smart Contract"
         Proxy(<a href="https://github.com/ethereum-optimism/optimism/blob/develop/packages/contracts-bedrock/src/universal/Proxy.sol">Proxy</a>)
-        Implementation(实现合约)
+        Implementation(Implementation)
     end
 
-    ProxyAdminOwner -->|管理| ProxyAdmin
-    ProxyAdmin -->|升级| Proxy
+    ProxyAdminOwner -->|manages| ProxyAdmin
+    ProxyAdmin -->|upgrades| Proxy
     Proxy -->|delegatecall| Implementation
 
     classDef l1Contracts stroke:#bbf,stroke-width:2px;
@@ -259,37 +259,37 @@ graph LR
 
 ```mermaid
 graph LR
-    subgraph "L2 节点"
-        RollupNode(<a href="https://specs.optimism.io/protocol/rollup-node.html">Rollup Node</a>)
-        ExecutionEngine(<a href="https://specs.optimism.io/protocol/exec-engine.html">Execution Engine</a>)
+    subgraph "L2 Node"
+        RollupNode(<a href="./rollup-node.html">Rollup Node</a>)
+        ExecutionEngine(<a href="./exec-engine.html">Execution Engine</a>)
     end
 
-    subgraph "系统交互"
-        BatchSubmitter(<a href="https://specs.optimism.io/protocol/batcher.html">Batch Submitter</a>)
+    subgraph "System Interactions"
+        BatchSubmitter(<a href="./batcher.html">Batch Submitter</a>)
         OutputSubmitter(Output Submitter)
         Challenger(Challenger)
     end
 
-    subgraph "L1 智能合约"
-        BatchDataEOA(<a href="https://specs.optimism.io/glossary.html#batcher-transaction">批次收件箱地址</a>)
-        OptimismPortal(<a href="https://specs.optimism.io/protocol/withdrawals.html#the-optimism-portal-contract">OptimismPortal</a>)
-        DisputeGameFactory(<a href="https://specs.optimism.io/fault-proof/stage-one/dispute-game-interface.html#disputegamefactory-interface">DisputeGameFactory</a>)
-        FaultDisputeGame(<a href="https://specs.optimism.io/fault-proof/stage-one/fault-dispute-game.html">FaultDisputeGame</a>)
+    subgraph "L1 Smart Contracts"
+        BatchDataEOA(<a href="../glossary.html#batcher-transaction">Batch Inbox Address</a>)
+        OptimismPortal(<a href="./withdrawals.html#the-optimism-portal-contract">OptimismPortal</a>)
+        DisputeGameFactory(<a href="../fault-proof/stage-one/dispute-game-interface.html#disputegamefactory-interface">DisputeGameFactory</a>)
+        FaultDisputeGame(<a href="../fault-proof/stage-one/fault-dispute-game.html">FaultDisputeGame</a>)
     end
 
-    BatchSubmitter -.->|获取交易批次信息| RollupNode
-    BatchSubmitter -.->|获取交易批次信息| ExecutionEngine
-    BatchSubmitter -->|发送交易批次| BatchDataEOA
+    BatchSubmitter -.->|fetch transaction batch info| RollupNode
+    BatchSubmitter -.->|fetch transaction batch info| ExecutionEngine
+    BatchSubmitter -->|send transaction batches| BatchDataEOA
 
-    RollupNode -.->|获取交易批次| BatchDataEOA
-    RollupNode -.->|获取存款交易| OptimismPortal
-    RollupNode -->|驱动| ExecutionEngine
+    RollupNode -.->|fetch transaction batches| BatchDataEOA
+    RollupNode -.->|fetch deposit transactions| OptimismPortal
+    RollupNode -->|drives| ExecutionEngine
 
-    OutputSubmitter -.->|获取输出| RollupNode
-    OutputSubmitter -->|发送输出提议| DisputeGameFactory
+    OutputSubmitter -.->|fetch outputs| RollupNode
+    OutputSubmitter -->|send output proposals| DisputeGameFactory
 
-    Challenger -.->|获取争议游戏| DisputeGameFactory
-    Challenger -->|验证/挑战/防御游戏| FaultDisputeGame
+    Challenger -.->|fetch dispute games| DisputeGameFactory
+    Challenger -->|verify/challenge/defend games| FaultDisputeGame
 
     classDef l2Components stroke:#333,stroke-width:2px;
     classDef systemUser stroke:#f9a,stroke-width:2px;
